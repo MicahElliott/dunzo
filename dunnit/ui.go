@@ -1,19 +1,25 @@
 package dun
 
 import (
-	"time"
 	"fmt"
+	"image/color"
+	"time"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+
 	// "fyne.io/fyne/v2/layout"
-	"fyne.io/fyne/v2/theme"
-	"fyne.io/fyne/v2/driver/desktop"
-	"fyne.io/fyne/v2/widget"
 	"log"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/theme"
+	"fyne.io/fyne/v2/widget"
+	"strings"
 )
 
 func recordActivity(text, category string) {
@@ -42,7 +48,7 @@ func recordActivity(text, category string) {
 	// f, err := os.OpenFile("/tmp/foo", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	f, err := os.OpenFile(fname, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	log.Println(err)
-	hm := time.Now().Format("[15:04]")
+	hm := time.Now().Format("[15:04:05]")
 	// outstr := hm + " DONE " + text + "\n"
 	outstr := hm + " " + category + " " + text + "\n"
 	fmt.Println(outstr)
@@ -78,6 +84,13 @@ func StartUI(a fyne.App) {
 	// label2 := widget.NewLabel("Label 2")
 	// value2 := widget.NewLabel("Something")
 
+	colorText := canvas.NewText("I colored this", color.White)
+	colorText.TextStyle = fyne.TextStyle{Bold: true}
+	lastDunnit := getLastDunnit()
+	commonTopics := getCommonTopics()
+
+	// TODO show day's GOALs
+
 	input := widget.NewEntry()
 	input.SetPlaceHolder("Enter text...")
 	// widget.Entry{Se}
@@ -86,12 +99,22 @@ func StartUI(a fyne.App) {
 	// widget.NewSelectEntry
 	category := widget.NewSelect([]string{
 		// "✔️ DONE", "🎯 GOAL", "📅 MTG", "🚫 BLKR", "💥 IMPACT", "📈 PRDTY", "🔚 SMRY" },
-		"✔️ DONE", "🎯 GOAL", "📅 MEETING", "🚫 BLOCKED", "💥 IMPACT", "📈 PRODUCTIVITY", "🔚 SUMMARY" },
+		"✔️ DONE", "🎯 GOAL", "📅 MEETING", "🚫 BLOCKED", "⛔❌ FAIL",
+		"💥 IMPACT", "📈 PRODUCTIVITY", "🔚 SUMMARY",
+		"🧠 TIL", "💡 IDEA", "🏆 WIN", "💼 CAREER (rare)", "🗑️ WASTED", "🏁 MILESTONE" },
+		// or "rock" 🪨 for "milestone"
 		func(cat string) { fmt.Println("saw a category:", cat)
-			selectedCat = cat
+			res := strings.Split(cat, " ")
+			// selectedCat = cat
+			selectedCat = res[1]
 		})
 	category.SetSelected("DONE") // default to DONE
+	colorLabel := widget.NewLabel("XXX Dunnit: ")
+	colorLabel.TextStyle = fyne.TextStyle{Bold: true}
 	content := container.NewVBox(
+		// widget.NewLabel(colorText),
+		widget.NewLabel("Common topics you use:" + commonTopics),
+		widget.NewLabel("Last Dunnit: " + lastDunnit),
 		widget.NewLabel("What would you like to record?"),
 		category,
 		input,
@@ -102,6 +125,9 @@ func StartUI(a fyne.App) {
 			// input.OnSubmitted: func() {input.SetPlaceHolder("Cleared on-submitted")}
 		}),
 		// label1, value1, label2, value2
+		widget.NewButton("Ditto", func() { fmt.Println("[FAKE] recording last dunnit") }),
+		widget.NewButton("Show today’s Dunnits", func() { fmt.Println("[FAKE] showing today's dunnits")} ),
+		widget.NewButton("Edit today’s Dunnits", func() { fmt.Println("[FAKE] editing today's dunnits")} ),
 	)
 
 	// grid := container.New(layout.NewFormLayout(),
@@ -146,6 +172,16 @@ func StartUI(a fyne.App) {
 	a.SendNotification( fyne.NewNotification("Something else", "After Run") )
 
 	tidyUp()
+}
+
+// TODO Look over last month's most-used tags. May need to support a list of non-work topics
+func getCommonTopics() string {
+	return "#personal #ticketno #dunnit #interview #lob #emacs #pts:3"
+}
+
+// TODO
+func getLastDunnit() string {
+	return "Finalized the whatzit"
 }
 
 func tidyUp() { fmt.Println("cleaning shit up") }

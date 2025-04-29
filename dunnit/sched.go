@@ -44,7 +44,7 @@ func Schedule(a fyne.App) gocron.Scheduler {
 
 	eod, err := s.NewJob(
 		gocron.DailyJob( 1,
-			gocron.NewAtTimes(gocron.NewAtTime(3, 45, 0)) ),
+			gocron.NewAtTimes(gocron.NewAtTime(15, 45, 0)) ),
 		gocron.NewTask(func() {
 			notify(a,
 				"End your day",
