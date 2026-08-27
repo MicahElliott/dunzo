@@ -119,7 +119,11 @@ func MakeUI() *fyne.App {
 	return &a
 }
 
-func StartUI(a fyne.App) {
+// BuildMainWindow constructs the main Dunzo entry window and tray menu,
+// but does not show it or start the Fyne event loop -- call a.Run()
+// yourself after this (see dunnit.go). Returns the window so callers
+// (e.g. the scheduler) can Show()/RequestFocus() it later.
+func BuildMainWindow(a fyne.App) fyne.Window {
 	a.Settings().SetTheme(theme.LightTheme())
 
 	w4 := a.NewWindow("Dunzo")
@@ -232,9 +236,7 @@ func StartUI(a fyne.App) {
 
 	w4.Show()
 
-	a.Run()
-
-	tidyUp()
+	return w4
 }
 
 func getGoals() []string {
@@ -264,8 +266,6 @@ func getLastDunnit() string {
 	}
 	return "(nothing recorded yet today)"
 }
-
-func tidyUp() { fmt.Println("cleaning shit up") }
 
 func updateTime(clock *widget.Label) {
 	formatted := time.Now().Format("Dunnit: 03:04:05")

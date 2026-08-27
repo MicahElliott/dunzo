@@ -8,74 +8,73 @@ import (
 	"github.com/go-co-op/gocron/v2"
 )
 
-func Schedule(a fyne.App) gocron.Scheduler {
-	fmt.Println("Starting scheduler")
+// parseHM parses "HH:MM" into hour, minute ints. Returns zeros on
+// parse failure (caller should treat that as "not configured").
+func parseHM(s string) (hour, minute int) {
+	fmt.Sscanf(s, "%d:%d", &hour, &minute)
+	return
+}
 
-	a.SendNotification(fyne.NewNotification("CRON", "Starting scheduler" ))
+// withinWorkHours reports whether now falls between the configured
+// day_start and day_end (inclusive), Mon-Fri only.
+func withinWorkHours(cfg Config, now time.Time) bool {
+	if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
+		return false
+	}
+	startH, startM := parseHM(cfg.DayStart)
+	endH, endM := parseHM(cfg.DayEnd)
+	start := time.Date(now.Year(), now.Month(), now.Day(), startH, startM, 0, 0, now.Location())
+	end := time.Date(now.Year(), now.Month(), now.Day(), endH, endM, 0, 0, now.Location())
+	return !now.Before(start) && !now.After(end)
+}
 
-	// create a scheduler
+// Schedule sets up the recurring popups (hourly activity prompt, and a
+// lunchtime goals reminder), reading times from config.toml. It shows
+// (raises) the given main window rather than just sending a passive
+// notification, since the whole point is to prompt for input.
+func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
+	cfg := LoadConfig()
+
 	s, err := gocron.NewScheduler()
-	if err != nil { }
-
-	// add a job to the scheduler
-	j, err := s.NewJob(
-		// gocron.DurationJob(3*time.Second),
-		gocron.DurationJob(30*time.Minute),
-		// gocron.DurationJob(10*time.Second),
-		gocron.NewTask(
-			func(x string, b int) {
-				fmt.Println("doing something")
-				a.SendNotification(fyne.NewNotification(
-					"Notificaton from inside cron!!",
-					"It's about that time" )) },
-			"hello", 1 ))
-	if err != nil { }
-	// each job has a unique id
-	fmt.Println(j.ID())
-
-	sod, err := s.NewJob(
-		gocron.DailyJob(1,
-			gocron.NewAtTimes(gocron.NewAtTime(7, 25, 0)) ),
-		gocron.NewTask(func() {
-			notify(a,
-				"Start your day",
-				"What will you do today?") }) )
-	fmt.Println(sod.Name())
-
-	eod, err := s.NewJob(
-		gocron.DailyJob( 1,
-			gocron.NewAtTimes(gocron.NewAtTime(15, 45, 0)) ),
-		gocron.NewTask(func() {
-			notify(a,
-				"End your day",
-				"What did you accomplish today?") }))
-	fmt.Println(eod.Name())
-	if err != nil { }
-
-	s.Start() // start the scheduler
-
-	select { // block until you are ready to shut down
-	case <-time.After(4 * time.Second):
-		fmt.Println("a minute has passed")
+	if err != nil {
+		fmt.Println("Error creating scheduler:", err)
+		return s
 	}
 
+	_, err = s.NewJob(
+		gocron.CronJob(fmt.Sprintf("%d * * * *", cfg.HourlyMinute), false),
+		gocron.NewTask(func() {
+			if !withinWorkHours(cfg, time.Now()) {
+				return
+			}
+			a.SendNotification(fyne.NewNotification(
+				"Dunzo", "What are you working on?"))
+			w.Show()
+			w.RequestFocus()
+		}),
+	)
+	if err != nil {
+		fmt.Println("Error scheduling hourly job:", err)
+	}
+
+	if lh, lm := parseHM(cfg.LunchTime); lh != 0 || lm != 0 {
+		_, err = s.NewJob(
+			gocron.DailyJob(1, gocron.NewAtTimes(gocron.NewAtTime(uint(lh), uint(lm), 0))),
+			gocron.NewTask(func() {
+				if !withinWorkHours(cfg, time.Now()) {
+					return
+				}
+				a.SendNotification(fyne.NewNotification(
+					"Dunzo Lunchtime", "How are your goals coming along?"))
+				w.Show()
+				w.RequestFocus()
+			}),
+		)
+		if err != nil {
+			fmt.Println("Error scheduling lunchtime job:", err)
+		}
+	}
+
+	s.Start()
 	return s
-
-	// err = s.Shutdown() // when you're done, shut it down
-	// if err != nil {
-	// 	// handle error
-	// }
-}
-
-func offHours() bool {
-	now := time.Now()
-	fmt.Println(now)
-	return false
-}
-
-func notify(a fyne.App, headline, msg string) {
-	if offHours() { fmt.Println("no-op since off hours")
-	} else {
-		fmt.Println(headline)
-		a.SendNotification(fyne.NewNotification(headline, msg)) }
 }
