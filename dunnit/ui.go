@@ -230,6 +230,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	if desk, ok := a.(desktop.App); ok {
 		m := fyne.NewMenu("Dunzo",
 			fyne.NewMenuItem("Show", func() { w4.Show() }),
+			fyne.NewMenuItem("Summarize...", func() { showSummarizeDialog(a) }),
 			fyne.NewMenuItem("Settings...", func() { showSettings(a) }),
 		)
 		desk.SetSystemTrayMenu(m)
