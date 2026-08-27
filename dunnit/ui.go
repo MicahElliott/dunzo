@@ -222,7 +222,8 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	w4.SetContent(content)
 	w4.SetCloseIntercept(func() { w4.Hide() })
 	w4.Canvas().AddShortcut(&desktop.CustomShortcut{
-		KeyName: fyne.KeyEscape,
+		KeyName:  fyne.KeyW,
+		Modifier: fyne.KeyModifierShortcutDefault, // Cmd+W on macOS, Ctrl+W elsewhere
 	}, func(fyne.Shortcut) { w4.Hide() })
 
 	// Menu
