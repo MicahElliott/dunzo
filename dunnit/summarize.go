@@ -103,7 +103,7 @@ func summarizeWithCopilot(ledgerText string) (string, error) {
 
 // showSummarizeDialog lets the user pick a period, then runs the
 // summary and displays the result in a new window.
-func showSummarizeDialog(a fyne.App) {
+func showSummarizeDialog(a fyne.App, parent fyne.Window) {
 	options := []string{string(periodDay), string(periodMonth), string(periodQuarter)}
 	periodSelect := widget.NewSelect(options, nil)
 	periodSelect.SetSelected(string(periodDay))
@@ -119,7 +119,7 @@ func showSummarizeDialog(a fyne.App) {
 			}
 			period := summaryPeriod(periodSelect.Selected)
 			runSummarize(a, period)
-		}, nil)
+		}, parent)
 	d.Show()
 }
 
