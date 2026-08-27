@@ -45,10 +45,15 @@ open Dunzo.app
 
 ## Data Storage
 
-Ledger files live under a `dunnits` directory, one file per day:
+Dunzo keeps everything (ledger files and `config.toml`) under a
+single root directory, `~/.config/dunzo` by default, overridable
+with the `DUNZO_DIR` env var (e.g. point it at a private git repo you
+sync across machines).
+
+Ledger files, one per day:
 
 ```
-<dunnits-dir>/<year>/w<week>-<month>/ledger-<YYYYMMDD>.txt
+$DUNZO_DIR/<year>/w<week>-<month>/ledger-<YYYYMMDD>.txt
 ```
 
 Each line looks like:
@@ -57,28 +62,22 @@ Each line looks like:
 [14:36] DONE Added string splitting for categories #dunnit
 ```
 
-The directory is expected to be a git repo (e.g. a private
+`$DUNZO_DIR` is expected to be (or contain) a git repo (e.g. a private
 `mydunnits` repo) so your history syncs across machines, mirroring the
 original dunnit setup.
 
 ## Configuration
 
-Settings live in a TOML file, `~/.config/dunzo/config.toml` by
-default (override the directory with `DUNZO_CONFIG_DIR`). It's
-created automatically on first run with these defaults (ported
-from dunnit's `config-example.zsh`):
+`$DUNZO_DIR/config.toml` is created automatically on first run with
+these defaults (ported from dunnit's `config-example.zsh`):
 
 ```toml
-dunnits_dir   = "~/.config/dunzo/mydunnits"
 day_start     = "08:00"
 day_end       = "17:30"
 hourly_minute = 58
 lunch_time    = "11:30"
 ```
 
-- `dunnits_dir`: where ledger files are stored. Can also be
-  overridden per-invocation with the `DUNZO_DIR` env var (which takes
-  priority over the config file).
 - `day_start` / `day_end`: your typical working hours, used to decide
   whether hourly popups should fire at all.
 - `hourly_minute`: minute-of-the-hour the popup should appear.

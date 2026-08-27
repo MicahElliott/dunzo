@@ -25,13 +25,14 @@ macOS and Linux.
   properly** to the config or UI (still has hardcoded demo times).
 - `dunnit/settings.go` — placeholder Settings window (dummy checkbox
   only so far).
-- `dunnit/config.go` — TOML config load/save
-  (`~/.config/dunzo/config.toml` by default, or `$DUNZO_CONFIG_DIR`).
+- `dunnit/config.go` — TOML config load/save. Everything dunzo owns
+  (ledgers + config.toml) lives under one root dir, `DunzoDir()`
+  (`~/.config/dunzo` by default, override with `$DUNZO_DIR`).
 - `dunnit/taskmenu.go` — currently just a stub, not wired to anything.
 
 ## Data format
 
-Ledger files: `<dunnits_dir>/<year>/w<week>-<month>/ledger-<YYYYMMDD>.txt`,
+Ledger files: `$DUNZO_DIR/<year>/w<week>-<month>/ledger-<YYYYMMDD>.txt`,
 one line per entry: `[HH:MM:SS] CATEGORY free text #tag`. See sample
 real data in the sibling `../mydunnits` repo for ground truth on
 format nuances (e.g. `GOAL`, `DONE`, `MEETING`, `TIL`, `WIN` categories

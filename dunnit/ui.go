@@ -26,16 +26,6 @@ import (
 	"bufio"
 )
 
-// dunzoDir returns the root directory where ledger files are stored.
-// Overridable via the DUNZO_DIR env var; otherwise comes from config.toml
-// (default ~/.config/dunzo/mydunnits).
-func dunzoDir() string {
-	if dir := os.Getenv("DUNZO_DIR"); dir != "" {
-		return dir
-	}
-	return LoadConfig().DunnitsDir
-}
-
 // Get today's ledger file path and name.
 func getLedger() (string, string) {
 	yr, wk := time.Now().ISOWeek()
@@ -45,7 +35,7 @@ func getLedger() (string, string) {
 	yr8 := tn.Format("20060102")
 	moname := t.Format("Jan")
 	fname0 := "ledger-"+yr8+".txt"
-	fpath := filepath.Join(dunzoDir(),
+	fpath := filepath.Join(DunzoDir(),
 		strconv.Itoa(yr), "w"+strconv.Itoa(wk)+"-"+moname)
 	fname := filepath.Join(fpath, fname0)
 	return fpath, fname
@@ -186,7 +176,7 @@ func StartUI(a fyne.App) {
 			}
 		}),
 		widget.NewButton("Show Dunnits", func() {
-			w3 := a.NewWindow("Dunnit: Today")
+			w3 := a.NewWindow("Dunzo: Today")
 			w3.SetContent(widget.NewLabel(strings.Join(readLedgerLines(), "\n")))
 			w3.Resize(fyne.NewSize(500, 400))
 			w3.Show()
@@ -203,7 +193,7 @@ func StartUI(a fyne.App) {
 					w4)
 				return
 			}
-			w3 := a.NewWindow("Dunnit: Goals")
+			w3 := a.NewWindow("Dunzo: Goals")
 			w3.SetContent(widget.NewLabel(strings.Join(goals, "\n")))
 			w3.Show()
 
@@ -233,7 +223,7 @@ func StartUI(a fyne.App) {
 
 	// Menu
 	if desk, ok := a.(desktop.App); ok {
-		m := fyne.NewMenu("Dunnit",
+		m := fyne.NewMenu("Dunzo",
 			fyne.NewMenuItem("Show", func() { w4.Show() }),
 			fyne.NewMenuItem("Settings...", func() { showSettings(a) }),
 		)

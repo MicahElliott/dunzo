@@ -9,12 +9,10 @@ import (
 )
 
 // Config holds user-configurable Dunzo preferences, loaded from a TOML
-// file. Ported from the original dunnit zsh config-example.zsh.
+// file at DunzoDir()/config.toml. Ported from the original dunnit zsh
+// config-example.zsh (minus dunnits_dir, which is now just DunzoDir()
+// itself -- everything dunzo owns lives under one root directory).
 type Config struct {
-	// DunnitsDir is where ledger files (and someday summaries) are
-	// stored. Overridable via DUNZO_DIR env var.
-	DunnitsDir string `toml:"dunnits_dir"`
-
 	// DayStart/DayEnd mark roughly when your working day runs, as
 	// "HH:MM" 24-hour strings. Used to decide whether hourly popups
 	// should fire at all.
@@ -32,7 +30,6 @@ type Config struct {
 // defaultConfig mirrors the values from dunnit's config-example.zsh.
 func defaultConfig() Config {
 	return Config{
-		DunnitsDir:   filepath.Join(configDir(), "mydunnits"),
 		DayStart:     "08:00",
 		DayEnd:       "17:30",
 		HourlyMinute: 58,
@@ -40,10 +37,12 @@ func defaultConfig() Config {
 	}
 }
 
-// configDir returns the directory holding dunzo's config file,
-// defaulting to ~/.config/dunzo, overridable via DUNZO_CONFIG_DIR.
-func configDir() string {
-	if dir := os.Getenv("DUNZO_CONFIG_DIR"); dir != "" {
+// DunzoDir is the single root directory for everything dunzo owns:
+// ledger files (DunzoDir()/<year>/w<week>-<month>/ledger-*.txt) and
+// config.toml. Overridable via the DUNZO_DIR env var; defaults to
+// ~/.config/dunzo.
+func DunzoDir() string {
+	if dir := os.Getenv("DUNZO_DIR"); dir != "" {
 		return dir
 	}
 	home, _ := os.UserHomeDir()
@@ -51,7 +50,7 @@ func configDir() string {
 }
 
 func configPath() string {
-	return filepath.Join(configDir(), "config.toml")
+	return filepath.Join(DunzoDir(), "config.toml")
 }
 
 // LoadConfig reads config.toml, creating it with defaults on first run
@@ -61,8 +60,8 @@ func LoadConfig() Config {
 	path := configPath()
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err := os.MkdirAll(configDir(), 0755); err != nil {
-			log.Println("Error creating config dir:", err)
+		if err := os.MkdirAll(DunzoDir(), 0755); err != nil {
+			log.Println("Error creating dunzo dir:", err)
 			return cfg
 		}
 		if err := writeConfig(cfg); err != nil {

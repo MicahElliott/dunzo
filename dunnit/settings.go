@@ -12,7 +12,7 @@ func SetThings() {
 }
 
 // showSettings pops up a placeholder settings window with a single
-// dummy boolean preference. Real prefs (schedule times, DUNZO_DIR,
+// dummy boolean preference. Real prefs (schedule times, ledger_dir,
 // etc.) can be added here later.
 func showSettings(a fyne.App) {
 	w := a.NewWindow("Dunzo Settings")
