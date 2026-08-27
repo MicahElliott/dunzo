@@ -49,8 +49,10 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 			}
 			a.SendNotification(fyne.NewNotification(
 				"Dunzo", "What are you working on?"))
-			w.Show()
-			w.RequestFocus()
+			fyne.Do(func() {
+				w.Show()
+				w.RequestFocus()
+			})
 		}),
 	)
 	if err != nil {
@@ -66,8 +68,10 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 				}
 				a.SendNotification(fyne.NewNotification(
 					"Dunzo Lunchtime", "How are your goals coming along?"))
-				w.Show()
-				w.RequestFocus()
+				fyne.Do(func() {
+					w.Show()
+					w.RequestFocus()
+				})
 			}),
 		)
 		if err != nil {
