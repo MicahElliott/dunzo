@@ -1,8 +1,8 @@
-Website = "https://example.com"
+Website = "https://github.com/MicahElliott/dunzo"
 
 [Details]
-  Icon = "Icon.png"
-  Name = "My App"
-  ID = "com.example.app"
-  Version = "1.0.0"
-  Build = 3
+Icon = "Icon.png"
+Name = "Dunzo"
+ID = "com.micahelliott.dunzo"
+Version = "0.1.0"
+Build = 2

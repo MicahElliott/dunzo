@@ -13,19 +13,31 @@ import (
 	// "fyne.io/fyne/v2/layout"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 
 	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"strings"
 	"bufio"
 )
 
+// dunzoDir returns the root directory where ledger files are stored.
+// Configurable via the DUNZO_DIR env var; defaults to ~/mydunnits.
+func dunzoDir() string {
+	if dir := os.Getenv("DUNZO_DIR"); dir != "" {
+		return dir
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, "mydunnits")
+}
+
 // Get today's ledger file path and name.
 func getLedger() (string, string) {
-	home, _ := os.UserHomeDir()
 	yr, wk := time.Now().ISOWeek()
 	// mo := time.Now().Month()
 	t := time.Now().UTC()
@@ -33,7 +45,7 @@ func getLedger() (string, string) {
 	yr8 := tn.Format("20060102")
 	moname := t.Format("Jan")
 	fname0 := "ledger-"+yr8+".txt"
-	fpath := filepath.Join(home, ".dunnit", "mydunnits",
+	fpath := filepath.Join(dunzoDir(),
 		strconv.Itoa(yr), "w"+strconv.Itoa(wk)+"-"+moname)
 	fname := filepath.Join(fpath, fname0)
 	return fpath, fname
@@ -41,20 +53,75 @@ func getLedger() (string, string) {
 
 func recordActivity(text, category string) {
 	log.Println("Content was:", text)
-	os.Stderr.WriteString(text)
 	fpath, fname := getLedger()
 	if _, err := os.Stat(fpath); os.IsNotExist(err) {
 		log.Println("Making new dir:", fpath)
 		os.MkdirAll(fpath, os.ModePerm) }
-	fmt.Println(fpath)
-	fmt.Println(fname)
 	f, err := os.OpenFile(fname, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	log.Println(err)
+	if err != nil {
+		log.Println("Error opening ledger:", err)
+		return
+	}
 	stamp := time.Now().Format("[15:04:05]")
 	outstr := stamp + " " + category + " " + text + "\n"
-	fmt.Println(outstr)
 	f.WriteString(outstr)
 	f.Close()
+}
+
+// readLedgerLines returns all lines from today's ledger file (empty if
+// none exist yet).
+func readLedgerLines() []string {
+	_, fname := getLedger()
+	f, err := os.Open(fname)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	var lines []string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines
+}
+
+// lastEntryText returns the free-text portion (after timestamp+category)
+// of the most recent ledger line, or "" if there isn't one.
+func lastEntryText() string {
+	lines := readLedgerLines()
+	if len(lines) == 0 {
+		return ""
+	}
+	last := lines[len(lines)-1]
+	parts := strings.SplitN(last, " ", 3)
+	if len(parts) < 3 {
+		return last
+	}
+	return parts[2]
+}
+
+// openInEditor opens the given file with $EDITOR, falling back to the
+// OS default opener (macOS `open`, Linux `xdg-open`). $EDITOR may
+// include flags (e.g. "emacsclient -c"), so it's split on whitespace.
+func openInEditor(path string) {
+	if editor := os.Getenv("EDITOR"); editor != "" {
+		fields := strings.Fields(editor)
+		args := append(fields[1:], path)
+		cmd := exec.Command(fields[0], args...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Start(); err != nil {
+			log.Println("Error launching $EDITOR:", err)
+		}
+		return
+	}
+	opener := "xdg-open"
+	if runtime.GOOS == "darwin" {
+		opener = "open"
+	}
+	if err := exec.Command(opener, path).Start(); err != nil {
+		log.Println("Error opening file:", err)
+	}
 }
 
 func MakeUI() *fyne.App {
@@ -62,28 +129,8 @@ func MakeUI() *fyne.App {
 	return &a
 }
 
-func makeCell() fyne.CanvasObject {
-	rect := canvas.NewRectangle(&color.NRGBA{128, 128, 128, 255})
-	rect.SetMinSize(fyne.NewSize(30, 30))
-	return rect
-}
-
 func StartUI(a fyne.App) {
-	// a := app.New()
-
-	//// New windows
-	w := a.NewWindow("Dunnit: Hello World")
 	a.Settings().SetTheme(theme.LightTheme())
-
-	w2 := a.NewWindow("Dunnit: Larger")
-	w2.SetContent(widget.NewLabel("More content"))
-	w2.SetContent(widget.NewButton("Open new", func() {
-		w3 := a.NewWindow("Dunnit: Third")
-		w3.SetContent(widget.NewLabel("Third"))
-		w3.Show()
-	}))
-	w2.Resize(fyne.NewSize(500, 300))
-	w2.Show()
 
 	w4 := a.NewWindow("Dunzo")
 	// label1 := widget.NewLabel("Label 1")
@@ -93,7 +140,7 @@ func StartUI(a fyne.App) {
 
 	green := color.NRGBA{R: 0, G: 180, B: 0, A: 255}
 	colorText := canvas.NewText("I colored this", green)
-	lastDunnit := getLastDunnit()
+	lastDunnitLabel := widget.NewLabel("Last Dunnit: " + getLastDunnit())
 	commonTopics := getCommonTopics()
 
 	// TODO show day's GOALs
@@ -102,7 +149,7 @@ func StartUI(a fyne.App) {
 	input.SetPlaceHolder("Enter text...")
 	// input.Resize(fyne.NewSize(100.0, 50.0))
 
-	selectedCat := "FOOBAR"
+	selectedCat := "DONE"
 	// widget.NewSelectEntry
 	category := widget.NewSelect([]string{
 		// "✔️ DONE", "🎯 GOAL", "📅 MTG", "🚫 BLKR", "💥 IMPACT", "📈 PRDTY", "🔚 SMRY" },
@@ -115,34 +162,49 @@ func StartUI(a fyne.App) {
 			// selectedCat = cat
 			selectedCat = res[1]
 		})
-	category.SetSelected("DONE") // default to DONE
-	colorLabel := widget.NewLabel("XXX Dunnit: ")
-	colorLabel.TextStyle = fyne.TextStyle{Bold: true}
+	category.SetSelected("✔️ DONE") // default to DONE
 
-	prompt := canvas.NewText("What would you like to record?", green)
-	justPrompt := container.NewWithoutLayout(prompt)
-
-	doneWrapper := container.NewBorder(nil, makeCell(), category, makeCell(), input)
+	doneWrapper := container.NewBorder(nil, nil, category, nil, input)
 
 	fmt.Println(input.MinSize())
 
+	saveEntry := func() {
+		if strings.TrimSpace(input.Text) == "" {
+			return
+		}
+		recordActivity(input.Text, selectedCat) // TODO trim emoji off front, and shorten to 4-char code
+		input.SetText("")
+		lastDunnitLabel.SetText("Last Dunnit: " + getLastDunnit())
+	}
+	input.OnSubmitted = func(string) { saveEntry() }
+
 	buttons := container.NewHBox(
-		widget.NewButton("Save", func() {
-			recordActivity(input.Text, selectedCat) // TODO trim emoji off front, and shorten to 4-char code
-			// clear form
-			// input.SetPlaceHolder("Enter text...") // FIXME not working
-			input.SetText("REPLACED TEXT...") // FIXME not working
-			// input.OnSubmitted: func() {input.SetPlaceHolder("Cleared on-submitted")}
+		widget.NewButton("Save", saveEntry),
+		widget.NewButton("Ditto", func() {
+			if txt := lastEntryText(); txt != "" {
+				input.SetText(txt)
+			}
 		}),
-		// label1, value1, label2, value2
-		widget.NewButton("Ditto", func() { fmt.Println("[FAKE] recording last dunnit") }),
-		widget.NewButton("Show Dunnits", func() { fmt.Println("[FAKE] showing today's dunnits")} ),
-		widget.NewButton("Edit Dunnits", func() { fmt.Println("[FAKE] editing today's dunnits")} ),
+		widget.NewButton("Show Dunnits", func() {
+			w3 := a.NewWindow("Dunnit: Today")
+			w3.SetContent(widget.NewLabel(strings.Join(readLedgerLines(), "\n")))
+			w3.Resize(fyne.NewSize(500, 400))
+			w3.Show()
+		}),
+		widget.NewButton("Edit Dunnits", func() {
+			_, fname := getLedger()
+			openInEditor(fname)
+		}),
 		widget.NewButton("Show Goals", func() {
 			goals := getGoals()
+			if len(goals) == 0 {
+				dialog.ShowInformation("No Goals Yet",
+					"You haven't set any goals today.\nRecord one with the GOAL category to get started!",
+					w4)
+				return
+			}
 			w3 := a.NewWindow("Dunnit: Goals")
-			// strings.
-			w3.SetContent(widget.NewLabel("Third"))
+			w3.SetContent(widget.NewLabel(strings.Join(goals, "\n")))
 			w3.Show()
 
 		} ),
@@ -152,7 +214,7 @@ func StartUI(a fyne.App) {
 		// widget.NewLabel(colorText),
 		widget.NewLabel("Common topics you use:" + commonTopics),
 		colorText,
-		widget.NewLabel("Last Dunnit: " + lastDunnit),
+		lastDunnitLabel,
 		widget.NewLabel("What would you like to record?"),
 		doneWrapper,
 		// category, input,
@@ -163,43 +225,26 @@ func StartUI(a fyne.App) {
 	// grid := container.New(layout.NewFormLayout(),
 	// 	label1, value1, label2, value2, content)
 
-	// w4.SetContent(grid)
-	w4.SetContent(justPrompt)
-	// w4.SetContent(colorText)
 	w4.SetContent(content)
-	w4.Show()
-
-	// Notification
-	a.SendNotification( fyne.NewNotification("Something happened", "Maybe this is serious.") )
+	w4.SetCloseIntercept(func() { w4.Hide() })
+	w4.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		if ev.Name == fyne.KeyEscape {
+			w4.Hide()
+		}
+	})
 
 	// Menu
 	if desk, ok := a.(desktop.App); ok {
-		h := fyne.NewMenuItem("Hello", func() {})
-		h.Icon = theme.HomeIcon()
 		m := fyne.NewMenu("Dunnit",
-			fyne.NewMenuItem("Show", func() { w.Show() }),
-			h,
+			fyne.NewMenuItem("Show", func() { w4.Show() }),
+			fyne.NewMenuItem("Settings...", func() { showSettings(a) }),
 		)
-		// desk.SetSystemTrayIcon("icon.png")
 		desk.SetSystemTrayMenu(m)
 	}
 
-	fmt.Println("hi there")
-	// w.SetContent(widget.NewLabel("Hello World!"))
-	// clock := widget.NewLabel(quote.Go())
-	clock := widget.NewLabel("my cluck")
-	// formatted := time.Now()
-	w.SetContent(clock)
-
-	w.SetCloseIntercept(func() { w.Hide() })
-
-	// Dynamic clock counter
-	// go func() { for range time.Tick(time.Second) { updateTime(clock) } }()
-	w.Show()
+	w4.Show()
 
 	a.Run()
-
-	a.SendNotification( fyne.NewNotification("Something else", "After Run") )
 
 	tidyUp()
 }
@@ -225,9 +270,11 @@ func getCommonTopics() string {
 	return "#personal #ticketno #dunnit #interview #lob #emacs #pts:3"
 }
 
-// TODO
 func getLastDunnit() string {
-	return "Finalized the whatzit"
+	if txt := lastEntryText(); txt != "" {
+		return txt
+	}
+	return "(nothing recorded yet today)"
 }
 
 func tidyUp() { fmt.Println("cleaning shit up") }
