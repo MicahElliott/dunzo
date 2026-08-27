@@ -133,7 +133,9 @@ func runSummarize(a fyne.App, period summaryPeriod) {
 	}
 
 	progress := a.NewWindow("Dunzo: Summarizing...")
-	progress.SetContent(widget.NewLabel("Asking gh copilot to summarize, please wait..."))
+	progress.SetContent(widget.NewLabel(
+		"Asking gh copilot to summarize, please wait...\n" +
+			"The generated report will be copied to your clipboard automatically."))
 	progress.Show()
 
 	go func() {
@@ -144,7 +146,9 @@ func runSummarize(a fyne.App, period summaryPeriod) {
 			if err != nil {
 				w.SetContent(widget.NewLabel("Error running gh copilot:\n" + err.Error()))
 			} else {
-				body := widget.NewLabel(summary)
+				a.Clipboard().SetContent(summary)
+				body := widget.NewMultiLineEntry()
+				body.SetText(summary)
 				body.Wrapping = fyne.TextWrapWord
 				w.SetContent(container.NewVScroll(body))
 			}

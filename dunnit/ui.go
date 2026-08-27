@@ -235,6 +235,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 				showSummarizeDialog(a, w4)
 			}),
 			fyne.NewMenuItem("Settings...", func() { showSettings(a) }),
+			fyne.NewMenuItem("End of Day...", func() { showEODWindow(a) }),
 		)
 		desk.SetSystemTrayMenu(m)
 	}

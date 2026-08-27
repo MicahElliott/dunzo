@@ -79,6 +79,26 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 		}
 	}
 
+	if eh, em := parseHM(cfg.DayEnd); eh != 0 || em != 0 {
+		_, err = s.NewJob(
+			gocron.DailyJob(1, gocron.NewAtTimes(gocron.NewAtTime(uint(eh), uint(em), 0))),
+			gocron.NewTask(func() {
+				now := time.Now()
+				if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
+					return
+				}
+				a.SendNotification(fyne.NewNotification(
+					"Dunzo", "End of day! Let's wrap up."))
+				fyne.Do(func() {
+					showEODWindow(a)
+				})
+			}),
+		)
+		if err != nil {
+			fmt.Println("Error scheduling end-of-day job:", err)
+		}
+	}
+
 	s.Start()
 	return s
 }
