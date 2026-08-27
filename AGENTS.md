@@ -1,0 +1,70 @@
+# AGENTS.md
+
+Guidance for AI coding assistants working in this repo.
+
+## Project intent
+
+Dunzo is a **KISS** Go/Fyne rewrite of `../dunnit` (a zsh
+proof-of-concept, see its `README.md` and `dunnit.zsh` for the
+original design and behavior). Keep dependencies and LOC minimal.
+Prefer reusing what's already in `go.mod` (e.g.
+`github.com/BurntSushi/toml` is already an indirect dep via Fyne —
+don't add a different TOML/YAML/JSON library).
+
+The end goal is a system-tray-only app that pops up hourly (during
+configured working hours) asking what the user is working on, and
+appends the answer to a dated ledger file. It should run well on both
+macOS and Linux.
+
+## Layout
+
+- `dunnit.go` — `main()`, currently a rough sketch wiring UI + scheduler.
+- `dunnit/ui.go` — the Fyne window/widgets, ledger read/write, editor
+  launching.
+- `dunnit/sched.go` — `gocron`-based scheduler; **not yet wired up
+  properly** to the config or UI (still has hardcoded demo times).
+- `dunnit/settings.go` — placeholder Settings window (dummy checkbox
+  only so far).
+- `dunnit/config.go` — TOML config load/save
+  (`~/.config/dunzo/config.toml` by default, or `$DUNZO_CONFIG_DIR`).
+- `dunnit/taskmenu.go` — currently just a stub, not wired to anything.
+
+## Data format
+
+Ledger files: `<dunnits_dir>/<year>/w<week>-<month>/ledger-<YYYYMMDD>.txt`,
+one line per entry: `[HH:MM:SS] CATEGORY free text #tag`. See sample
+real data in the sibling `../mydunnits` repo for ground truth on
+format nuances (e.g. `GOAL`, `DONE`, `MEETING`, `TIL`, `WIN` categories
+seen in practice). Do not assume `dunnit.zsh`'s exact category set is
+final — the Fyne UI currently defines its own (with emoji labels) in
+`ui.go`'s `category` widget; keep these in sync if you change one.
+
+## Build/verify
+
+```sh
+make build   # go build -o dunzo .
+make vet     # go vet ./...
+make package # macOS only; requires `fyne` CLI (go install fyne.io/tools/cmd/fyne@latest)
+```
+
+Always run `make build` (and check `go vet`/editor diagnostics) after
+edits — there's no CI here yet. First build of Fyne's cgo/GL deps can
+take a couple minutes; subsequent builds are fast.
+
+There is no automated test suite yet. Manual testing is done by the
+human running `./dunzo` or `Dunzo.app` and clicking around — when
+making UI changes, describe what to click/verify rather than assuming
+you can confirm it yourself.
+
+## Working style for this repo
+
+- Do a lot of small checkpoints; ask before big-scope changes (this
+  project's owner explicitly wants frequent check-ins here, more than
+  usual).
+- This is a **personal project** — direct commits to `main` are fine
+  (no feature-branch requirement, unlike this user's work repos).
+- Don't install new tools/dependencies without asking first.
+- Prefer small, targeted diffs — this codebase still has some rough
+  demo-code cruft (commented-out blocks, TODOs, unused helpers) left
+  over from early Fyne experimentation; clean it up opportunistically
+  when touching nearby code, but no need to do a big sweep unprompted.

@@ -27,13 +27,13 @@ import (
 )
 
 // dunzoDir returns the root directory where ledger files are stored.
-// Configurable via the DUNZO_DIR env var; defaults to ~/mydunnits.
+// Overridable via the DUNZO_DIR env var; otherwise comes from config.toml
+// (default ~/.config/dunzo/mydunnits).
 func dunzoDir() string {
 	if dir := os.Getenv("DUNZO_DIR"); dir != "" {
 		return dir
 	}
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, "mydunnits")
+	return LoadConfig().DunnitsDir
 }
 
 // Get today's ledger file path and name.
@@ -227,11 +227,9 @@ func StartUI(a fyne.App) {
 
 	w4.SetContent(content)
 	w4.SetCloseIntercept(func() { w4.Hide() })
-	w4.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
-		if ev.Name == fyne.KeyEscape {
-			w4.Hide()
-		}
-	})
+	w4.Canvas().AddShortcut(&desktop.CustomShortcut{
+		KeyName: fyne.KeyEscape,
+	}, func(fyne.Shortcut) { w4.Hide() })
 
 	// Menu
 	if desk, ok := a.(desktop.App); ok {
