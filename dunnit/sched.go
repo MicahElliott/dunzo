@@ -41,14 +41,20 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 		return s
 	}
 
-	// intervalDuration is how often this job fires (once per hour, at
-	// cfg.HourlyMinute past the hour). FR-01: if the user already
-	// logged an entry more recently than this interval, skip the
-	// nudge -- they're clearly already engaged, no need to interrupt.
-	intervalDuration := time.Hour
+	// intervalDuration is how often this job fires, from
+	// cfg.NudgeIntervalMinutes (FR-04; falls back to 60 if unset/
+	// invalid, e.g. an old config.toml predating this key). FR-01: if
+	// the user already logged an entry more recently than this
+	// interval, skip the nudge -- they're clearly already engaged, no
+	// need to interrupt.
+	intervalMinutes := cfg.NudgeIntervalMinutes
+	if intervalMinutes <= 0 {
+		intervalMinutes = 60
+	}
+	intervalDuration := time.Duration(intervalMinutes) * time.Minute
 
 	_, err = s.NewJob(
-		gocron.CronJob(fmt.Sprintf("%d * * * *", cfg.HourlyMinute), false),
+		gocron.DurationJob(intervalDuration),
 		gocron.NewTask(func() {
 			now := time.Now()
 			if !withinWorkHours(cfg, now) {
@@ -66,7 +72,7 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 		}),
 	)
 	if err != nil {
-		fmt.Println("Error scheduling hourly job:", err)
+		fmt.Println("Error scheduling interval job:", err)
 	}
 
 	if lh, lm := parseHM(cfg.LunchTime); lh != 0 || lm != 0 {

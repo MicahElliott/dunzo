@@ -21,7 +21,14 @@ type Config struct {
 
 	// HourlyMinute is the minute of every hour when the popup should
 	// appear (e.g. 58 means it pops at :58 past each hour).
+	// Deprecated: replaced by NudgeIntervalMinutes (FR-04). Kept only
+	// so old config.toml files with this key don't fail to decode;
+	// no longer read by the scheduler.
 	HourlyMinute int `toml:"hourly_minute"`
+
+	// NudgeIntervalMinutes is how often (in minutes) the capture
+	// nudge fires during work hours, e.g. 30/45/60/90.
+	NudgeIntervalMinutes int `toml:"nudge_interval_minutes"`
 
 	// LunchTime is "HH:MM" for a midday goals-reminder popup.
 	LunchTime string `toml:"lunch_time"`
@@ -30,10 +37,10 @@ type Config struct {
 // defaultConfig mirrors the values from dunnit's config-example.zsh.
 func defaultConfig() Config {
 	return Config{
-		DayStart:     "08:00",
-		DayEnd:       "17:30",
-		HourlyMinute: 58,
-		LunchTime:    "11:30",
+		DayStart:             "08:00",
+		DayEnd:               "17:30",
+		NudgeIntervalMinutes: 60,
+		LunchTime:            "11:30",
 	}
 }
 

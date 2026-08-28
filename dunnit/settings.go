@@ -25,8 +25,8 @@ func showSettings(a fyne.App) {
 	dayEnd := widget.NewEntry()
 	dayEnd.SetText(cfg.DayEnd)
 
-	hourlyMinute := widget.NewEntry()
-	hourlyMinute.SetText(strconv.Itoa(cfg.HourlyMinute))
+	nudgeInterval := widget.NewEntry()
+	nudgeInterval.SetText(strconv.Itoa(cfg.NudgeIntervalMinutes))
 
 	lunchTime := widget.NewEntry()
 	lunchTime.SetText(cfg.LunchTime)
@@ -34,20 +34,20 @@ func showSettings(a fyne.App) {
 	form := widget.NewForm(
 		widget.NewFormItem("Day Start (HH:MM)", dayStart),
 		widget.NewFormItem("Day End (HH:MM)", dayEnd),
-		widget.NewFormItem("Hourly Popup Minute", hourlyMinute),
+		widget.NewFormItem("Nudge Interval (minutes)", nudgeInterval),
 		widget.NewFormItem("Lunch Time (HH:MM)", lunchTime),
 	)
 	form.OnSubmit = func() {
-		minute, err := strconv.Atoi(hourlyMinute.Text)
+		minutes, err := strconv.Atoi(nudgeInterval.Text)
 		if err != nil {
-			dialog.ShowError(fmt.Errorf("Hourly Popup Minute must be a number: %w", err), w)
+			dialog.ShowError(fmt.Errorf("Nudge Interval must be a number: %w", err), w)
 			return
 		}
 		newCfg := Config{
-			DayStart:     dayStart.Text,
-			DayEnd:       dayEnd.Text,
-			HourlyMinute: minute,
-			LunchTime:    lunchTime.Text,
+			DayStart:             dayStart.Text,
+			DayEnd:               dayEnd.Text,
+			NudgeIntervalMinutes: minutes,
+			LunchTime:            lunchTime.Text,
 		}
 		if err := writeConfig(newCfg); err != nil {
 			dialog.ShowError(err, w)
