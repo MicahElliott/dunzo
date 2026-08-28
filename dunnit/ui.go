@@ -188,18 +188,13 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 	selectedCat := "DONE"
 	// widget.NewSelectEntry
-	category := widget.NewSelect([]string{
-		// "✔️ DONE", "🎯 GOAL", "📅 MTG", "🚫 BLKR", "💥 IMPACT", "📈 PRDTY", "🔚 SMRY" },
-		"✔️ DONE", "🎯 GOAL", "📅 MEETING", "🚫 BLOCKED", "⛔❌ FAIL",
-		"💥 IMPACT", "📈 PRODUCTIVITY", "🔚 SUMMARY",
-		"🧠 TIL", "💡 IDEA", "🏆 WIN", "💼 CAREER (rare)", "🗑️ WASTED", "🏁 MILESTONE" },
-		// or "rock" 🪨 for "milestone"
+	category := widget.NewSelect(CategoryLabels(),
 		func(cat string) { fmt.Println("saw a category:", cat)
 			res := strings.Split(cat, " ")
 			// selectedCat = cat
 			selectedCat = res[1]
 		})
-	category.SetSelected("✔️ DONE") // default to DONE
+	category.SetSelected(Categories[0].Label()) // default to DONE
 
 	doneWrapper := container.NewBorder(nil, nil, category, nil, input)
 
