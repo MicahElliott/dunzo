@@ -153,10 +153,11 @@ func showCategoryLegend(a fyne.App) {
 		}
 		txt := canvas.NewText(c.Label()+" -- "+c.Help, theme.Color(theme.ColorNameForeground))
 		txt.TextSize = 10
+		txt.TextStyle = fyne.TextStyle{Monospace: true}
 		switch c.Sentiment {
 		case "positive":
 			txt.Color = darkGreen
-			txt.TextStyle = fyne.TextStyle{Bold: true}
+			txt.TextStyle = fyne.TextStyle{Monospace: true, Bold: true}
 		case "negative":
 			txt.Color = darkRed
 		}
@@ -227,6 +228,29 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	input.SetPlaceHolder("Enter text...")
 	// input.Resize(fyne.NewSize(100.0, 50.0))
 
+	// minsInput is an optional free-text "minutes spent" field (very
+	// informal time tracking). When non-empty and numeric, its value
+	// is appended to the recorded text as " @Nm" (e.g. "@20m"). Most
+	// meaningful for temporal/effort-bearing categories (see
+	// IsTimeTrackable) but not hard-restricted to them.
+	minsInput := widget.NewEntry()
+	minsInput.SetPlaceHolder("mins")
+	minsInput.Resize(fyne.NewSize(50, minsInput.MinSize().Height))
+
+	// withMins appends " @Nm" to text if minsInput has a valid
+	// positive integer in it; otherwise returns text unchanged.
+	withMins := func(text string) string {
+		raw := strings.TrimSpace(minsInput.Text)
+		if raw == "" {
+			return text
+		}
+		n, err := strconv.Atoi(raw)
+		if err != nil || n <= 0 {
+			return text
+		}
+		return text + " @" + raw + "m"
+	}
+
 	selectedCat := "DONE"
 	// widget.NewSelectEntry
 	category := widget.NewSelect(CategoryLabelsForGroup("now"),
@@ -250,46 +274,43 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	groupFilter.SetSelected("Now")
 
 	categoryRow := container.NewBorder(nil, nil, groupFilter, nil, category)
-	doneWrapper := container.NewBorder(nil, nil, categoryRow, nil, input)
+	doneWrapper := container.NewBorder(nil, nil, categoryRow, minsInput, input)
 
 	fmt.Println(input.MinSize())
 
-	// openItemsBox displays currently-open TODO/GOAL lines with a
-	// convert-to-DONE action each (FR-07). refreshOpenItems rebuilds
-	// it from the current ledger contents; called after any save or
-	// convert action so the list stays in sync.
+	// openItemsBox displays currently-open TODO/GOAL lines together
+	// under one "Upcoming" heading (FR-07), each with "Done" (convert
+	// to DONE) and "Stall" (defer to SOMEDAY, keeping the list from
+	// growing unbounded) actions. refreshOpenItems rebuilds it from
+	// the current ledger contents; called after any save/convert/
+	// stall action so the list stays in sync.
 	openItemsBox := container.NewVBox()
 	var refreshOpenItems func()
 	refreshOpenItems = func() {
 		openItemsBox.RemoveAll()
-		var todos, goals []OpenItem
-		for _, item := range getOpenItems() {
-			if item.Category == "GOAL" {
-				goals = append(goals, item)
-			} else {
-				todos = append(todos, item)
-			}
+		items := getOpenItems()
+		if len(items) == 0 {
+			openItemsBox.Refresh()
+			return
 		}
-		addRow := func(item OpenItem) {
-			row := container.NewBorder(nil, nil, nil,
-				widget.NewButton("Done", func() {
-					recordConvertedDone(item)
-					refreshOpenItems()
-				}),
-				widget.NewLabel(item.Category+": "+item.Text))
+		openItemsBox.Add(widget.NewLabelWithStyle("Upcoming", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
+		for _, item := range items {
+			item := item // capture for closures below
+			catLabel := canvas.NewText(item.Category, theme.Color(theme.ColorNameForeground))
+			catLabel.TextStyle = fyne.TextStyle{Monospace: true}
+			row := container.NewBorder(nil, nil, catLabel,
+				container.NewHBox(
+					widget.NewButton("Stall", func() {
+						recordStalled(item)
+						refreshOpenItems()
+					}),
+					widget.NewButton("Done", func() {
+						recordConvertedDone(item)
+						refreshOpenItems()
+					}),
+				),
+				widget.NewLabel(item.Text))
 			openItemsBox.Add(row)
-		}
-		if len(todos) > 0 {
-			openItemsBox.Add(widget.NewLabelWithStyle("Open TODOs", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
-			for _, item := range todos {
-				addRow(item)
-			}
-		}
-		if len(goals) > 0 {
-			openItemsBox.Add(widget.NewLabelWithStyle("Goals", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
-			for _, item := range goals {
-				addRow(item)
-			}
 		}
 		openItemsBox.Refresh()
 	}
@@ -299,8 +320,9 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		if strings.TrimSpace(input.Text) == "" {
 			return
 		}
-		recordActivity(input.Text, selectedCat) // TODO trim emoji off front, and shorten to 4-char code
+		recordActivity(withMins(input.Text), selectedCat) // TODO trim emoji off front, and shorten to 4-char code
 		input.SetText("")
+		minsInput.SetText("")
 		lastDunnitLabel.SetText("Last Dunnit: " + getLastDunnit())
 		refreshOpenItems()
 	}
@@ -309,8 +331,16 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	buttons := container.NewHBox(
 		widget.NewButton("Save", saveEntry),
 		widget.NewButton("Ditto", func() {
+			// Ditto now logs an ONGOING entry for the last recorded
+			// text, rather than just copying it into the input box
+			// under whatever category happens to be selected --
+			// repeating "still working on X" isn't the same as a
+			// fresh DONE each time.
 			if txt := lastEntryText(); txt != "" {
-				input.SetText(txt)
+				recordActivity(withMins(txt), "ONGOING")
+				minsInput.SetText("")
+				lastDunnitLabel.SetText("Last Dunnit: " + getLastDunnit())
+				refreshOpenItems()
 			}
 		}),
 		widget.NewButton("Show Dunnits", func() {

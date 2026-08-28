@@ -8,6 +8,8 @@ func TestParseOpenItems(t *testing.T) {
 		"[08:05:00] GOAL learn go",
 		"[09:00:00] DONE write report (via TODO)",
 		"[10:00:00] TODO another task",
+		"[11:00:00] TODO stalled task",
+		"[11:05:00] SOMEDAY stalled task (via TODO)",
 	}
 	open := parseOpenItems(lines)
 	if len(open) != 2 {

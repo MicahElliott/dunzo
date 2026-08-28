@@ -23,6 +23,21 @@ type Category struct {
 	Sentiment string
 }
 
+// timeTrackableCategories are the codes for which the optional "mins"
+// field (see BuildMainWindow) makes the most sense -- temporal/
+// effort-bearing entries. Not enforced strictly; just used to hint in
+// the UI.
+var timeTrackableCategories = map[string]bool{
+	"DONE": true, "ONGOING": true, "TODO": true, "FAIL": true,
+	"WASTED": true, "MEETING": true, "WAITING": true,
+}
+
+// IsTimeTrackable reports whether mins tracking is conventionally
+// meaningful for this category code.
+func IsTimeTrackable(code string) bool {
+	return timeTrackableCategories[code]
+}
+
 // Label returns the picker-facing string, e.g. "✔️ DONE".
 func (c Category) Label() string {
 	return c.Emoji + " " + c.Code
@@ -51,7 +66,7 @@ func GroupLabel(group string) string {
 var Categories = []Category{
 	// now: day-to-day capture
 	{"✔️", "DONE", "Something you completed.", "now", "positive"},
-	{"📌", "TODO", "A small, tight, near-term item -- actively encouraged.", "now", ""},
+	{"⏩", "ONGOING", "Still working on something (e.g. what \"Ditto\" now logs) -- not finished yet.", "now", ""},
 	{"💡", "IDEA", "A new idea worth capturing.", "now", ""},
 	{"❓", "QUESTION", "An open question to follow up on.", "now", ""},
 	{"🧠", "TIL", "Today I Learned -- something new you picked up.", "now", "positive"},
@@ -63,8 +78,9 @@ var Categories = []Category{
 	{"⚠️", "RISK", "A risk worth flagging/tracking.", "now", "negative"},
 
 	// plan: future-facing
+	{"📌", "TODO", "A small, tight, near-term item -- actively encouraged.", "plan", ""},
 	{"🎯", "GOAL", "A bigger overarching aim, reviewed on a longer cadence (not daily).", "plan", ""},
-	{"🕰️", "SOMEDAY", "Something you might want to do eventually, not now.", "plan", ""},
+	{"🕰️", "SOMEDAY", "Something you might want to do eventually, not now (also where stalled TODOs/GOALs land).", "plan", ""},
 	{"🏎️", "OPTIMIZE", "Something working but worth improving/speeding up.", "plan", ""},
 
 	// reflect: retrospective, best suited for End of Day wrap-up
