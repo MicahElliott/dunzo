@@ -402,6 +402,12 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			}),
 			fyne.NewMenuItem("Settings...", func() { showSettings(a) }),
 			fyne.NewMenuItem("Category Legend...", func() { showCategoryLegend(a) }),
+			fyne.NewMenuItem("Undo/Edit Last Entry...", func() {
+				showUndoEditLastEntry(a, func() {
+					lastDunnitLabel.SetText("Last Dunnit: " + getLastDunnit())
+					refreshOpenItems()
+				})
+			}),
 			fyne.NewMenuItem("End of Day...", func() { showEODWindow(a) }),
 		)
 		desk.SetSystemTrayMenu(m)
