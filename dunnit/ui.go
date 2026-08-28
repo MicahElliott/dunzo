@@ -127,19 +127,43 @@ func openInEditor(path string) {
 }
 
 // showCategoryLegend opens a static window listing every category's
-// emoji/code and one-line intended-use description (FR-06). Text
-// comes directly from Categories (categories.go), so it can't drift
-// out of sync with the actual picker options.
+// emoji/code and one-line intended-use description (FR-06), grouped
+// by Now/Plan/Reflect with section headers. Text comes directly from
+// Categories (categories.go), so it can't drift out of sync with the
+// actual picker options. Positive-sentiment categories render bold
+// dark green; negative-sentiment ones render dark red.
+//
+// Note: this coloring only applies to the static Legend window --
+// Fyne's widget.Select doesn't support per-option rich text/color in
+// its dropdown, so the live category picker itself stays plain text.
 func showCategoryLegend(a fyne.App) {
+	darkGreen := color.NRGBA{R: 0, G: 100, B: 0, A: 255}
+	darkRed := color.NRGBA{R: 139, G: 0, B: 0, A: 255}
+
 	w := a.NewWindow("Dunzo: Category Legend")
 	rows := container.NewVBox()
+	lastGroup := ""
 	for _, c := range Categories {
+		if c.Group != lastGroup {
+			header := canvas.NewText(GroupLabel(c.Group), theme.Color(theme.ColorNameForeground))
+			header.TextSize = 12
+			header.TextStyle = fyne.TextStyle{Bold: true}
+			rows.Add(header)
+			lastGroup = c.Group
+		}
 		txt := canvas.NewText(c.Label()+" -- "+c.Help, theme.Color(theme.ColorNameForeground))
 		txt.TextSize = 10
+		switch c.Sentiment {
+		case "positive":
+			txt.Color = darkGreen
+			txt.TextStyle = fyne.TextStyle{Bold: true}
+		case "negative":
+			txt.Color = darkRed
+		}
 		rows.Add(txt)
 	}
 	scroll := container.NewVScroll(rows)
-	scroll.SetMinSize(fyne.NewSize(560, 300))
+	scroll.SetMinSize(fyne.NewSize(560, 340))
 	w.SetContent(scroll)
 	w.Show()
 }
