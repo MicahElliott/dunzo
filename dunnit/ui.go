@@ -10,7 +10,6 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
-	// "fyne.io/fyne/v2/layout"
 	"log"
 	"os"
 	"os/exec"
@@ -136,11 +135,11 @@ func showCategoryLegend(a fyne.App) {
 	rows := container.NewVBox()
 	for _, c := range Categories {
 		txt := canvas.NewText(c.Label()+" -- "+c.Help, theme.Color(theme.ColorNameForeground))
-		txt.TextSize = 11
+		txt.TextSize = 10
 		rows.Add(txt)
 	}
 	scroll := container.NewVScroll(rows)
-	scroll.SetMinSize(fyne.NewSize(520, 320))
+	scroll.SetMinSize(fyne.NewSize(560, 300))
 	w.SetContent(scroll)
 	w.Show()
 }
@@ -206,7 +205,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 	selectedCat := "DONE"
 	// widget.NewSelectEntry
-	category := widget.NewSelect(CategoryLabels(),
+	category := widget.NewSelect(CategoryLabelsForGroup("now"),
 		func(cat string) { fmt.Println("saw a category:", cat)
 			res := strings.Split(cat, " ")
 			// selectedCat = cat
@@ -214,7 +213,20 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		})
 	category.SetSelected(Categories[0].Label()) // default to DONE
 
-	doneWrapper := container.NewBorder(nil, nil, category, nil, input)
+	// groupFilter narrows the category picker to a subset (FR-06
+	// follow-up): "now" (default, day-to-day capture), "plan"
+	// (future-facing), "reflect" (retrospective/EOD-ish), or "all".
+	// Purely a UI convenience over the same Categories list.
+	groupFilter := widget.NewSelect([]string{"Now", "Plan", "Reflect", "All"},
+		func(g string) {
+			category.Options = CategoryLabelsForGroup(strings.ToLower(g))
+			category.SetSelected(category.Options[0])
+			category.Refresh()
+		})
+	groupFilter.SetSelected("Now")
+
+	categoryRow := container.NewBorder(nil, nil, groupFilter, nil, category)
+	doneWrapper := container.NewBorder(nil, nil, categoryRow, nil, input)
 
 	fmt.Println(input.MinSize())
 
