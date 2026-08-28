@@ -135,10 +135,12 @@ func showCategoryLegend(a fyne.App) {
 	w := a.NewWindow("Dunzo: Category Legend")
 	rows := container.NewVBox()
 	for _, c := range Categories {
-		rows.Add(widget.NewLabel(c.Label() + " -- " + c.Help))
+		txt := canvas.NewText(c.Label()+" -- "+c.Help, theme.Color(theme.ColorNameForeground))
+		txt.TextSize = 11
+		rows.Add(txt)
 	}
 	scroll := container.NewVScroll(rows)
-	scroll.SetMinSize(fyne.NewSize(480, 400))
+	scroll.SetMinSize(fyne.NewSize(520, 320))
 	w.SetContent(scroll)
 	w.Show()
 }

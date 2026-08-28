@@ -1,6 +1,8 @@
-.PHONY: build run package clean vet
+.PHONY: run package clean vet
 
-build:
+build: dunzo
+
+dunzo: $(shell find . -name '*.go')
 	go build -o dunzo .
 
 run: build
