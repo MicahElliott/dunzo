@@ -41,6 +41,18 @@ func getLedger() (string, string) {
 	return fpath, fname
 }
 
+// lastActivityAt tracks the wall-clock time of the most recent
+// recordActivity() call, so the scheduler (sched.go) can suppress a
+// periodic nudge if the user already logged something recently (see
+// FR-01). Zero value means "nothing recorded since process start".
+var lastActivityAt time.Time
+
+// LastActivityAt returns the time of the most recent recorded entry
+// (zero time if none yet this run).
+func LastActivityAt() time.Time {
+	return lastActivityAt
+}
+
 func recordActivity(text, category string) {
 	log.Println("Content was:", text)
 	fpath, fname := getLedger()
@@ -56,6 +68,7 @@ func recordActivity(text, category string) {
 	outstr := stamp + " " + category + " " + text + "\n"
 	f.WriteString(outstr)
 	f.Close()
+	lastActivityAt = time.Now()
 }
 
 // readLedgerLines returns all lines from today's ledger file (empty if
@@ -119,6 +132,36 @@ func MakeUI() *fyne.App {
 	return &a
 }
 
+// closeShortcutEntry is a widget.Entry that additionally recognizes
+// the given close shortcut (Cmd+W/Ctrl+W) even while it has focus.
+// Fyne's Entry widget has its own ShortcutHandler and normally
+// swallows all TypedShortcut calls when focused, so a shortcut added
+// only via Canvas().AddShortcut never reaches the window-level
+// handler in that case (FR-02). We check for our specific shortcut
+// first and invoke onClose directly; anything else falls through to
+// the embedded Entry's normal shortcut handling (cut/copy/paste etc).
+type closeShortcutEntry struct {
+	widget.Entry
+	closeKey fyne.KeyName
+	closeMod fyne.KeyModifier
+	onClose  func()
+}
+
+func newCloseShortcutEntry(closeKey fyne.KeyName, closeMod fyne.KeyModifier, onClose func()) *closeShortcutEntry {
+	e := &closeShortcutEntry{closeKey: closeKey, closeMod: closeMod, onClose: onClose}
+	e.ExtendBaseWidget(e)
+	return e
+}
+
+func (e *closeShortcutEntry) TypedShortcut(shortcut fyne.Shortcut) {
+	if cs, ok := shortcut.(*desktop.CustomShortcut); ok &&
+		cs.KeyName == e.closeKey && cs.Modifier == e.closeMod {
+		e.onClose()
+		return
+	}
+	e.Entry.TypedShortcut(shortcut)
+}
+
 // BuildMainWindow constructs the main Dunzo entry window and tray menu,
 // but does not show it or start the Fyne event loop -- call a.Run()
 // yourself after this (see dunnit.go). Returns the window so callers
@@ -139,7 +182,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 	// TODO show day's GOALs
 
-	input := widget.NewEntry()
+	input := newCloseShortcutEntry(fyne.KeyW, fyne.KeyModifierShortcutDefault, func() { w4.Hide() })
 	input.SetPlaceHolder("Enter text...")
 	// input.Resize(fyne.NewSize(100.0, 50.0))
 
