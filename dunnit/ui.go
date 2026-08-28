@@ -254,6 +254,47 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 	fmt.Println(input.MinSize())
 
+	// openItemsBox displays currently-open TODO/GOAL lines with a
+	// convert-to-DONE action each (FR-07). refreshOpenItems rebuilds
+	// it from the current ledger contents; called after any save or
+	// convert action so the list stays in sync.
+	openItemsBox := container.NewVBox()
+	var refreshOpenItems func()
+	refreshOpenItems = func() {
+		openItemsBox.RemoveAll()
+		var todos, goals []OpenItem
+		for _, item := range getOpenItems() {
+			if item.Category == "GOAL" {
+				goals = append(goals, item)
+			} else {
+				todos = append(todos, item)
+			}
+		}
+		addRow := func(item OpenItem) {
+			row := container.NewBorder(nil, nil, nil,
+				widget.NewButton("Done", func() {
+					recordConvertedDone(item)
+					refreshOpenItems()
+				}),
+				widget.NewLabel(item.Category+": "+item.Text))
+			openItemsBox.Add(row)
+		}
+		if len(todos) > 0 {
+			openItemsBox.Add(widget.NewLabelWithStyle("Open TODOs", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
+			for _, item := range todos {
+				addRow(item)
+			}
+		}
+		if len(goals) > 0 {
+			openItemsBox.Add(widget.NewLabelWithStyle("Goals", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
+			for _, item := range goals {
+				addRow(item)
+			}
+		}
+		openItemsBox.Refresh()
+	}
+	refreshOpenItems()
+
 	saveEntry := func() {
 		if strings.TrimSpace(input.Text) == "" {
 			return
@@ -261,6 +302,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		recordActivity(input.Text, selectedCat) // TODO trim emoji off front, and shorten to 4-char code
 		input.SetText("")
 		lastDunnitLabel.SetText("Last Dunnit: " + getLastDunnit())
+		refreshOpenItems()
 	}
 	input.OnSubmitted = func(string) { saveEntry() }
 
@@ -305,6 +347,8 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		doneWrapper,
 		// category, input,
 		buttons,
+		widget.NewSeparator(),
+		openItemsBox,
 	)
 	log.Println(content)
 
@@ -321,7 +365,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// Menu
 	if desk, ok := a.(desktop.App); ok {
 		m := fyne.NewMenu("Dunzo",
-			fyne.NewMenuItem("Show", func() { w4.Show() }),
+			fyne.NewMenuItem("Show", func() { refreshOpenItems(); w4.Show() }),
 			fyne.NewMenuItem("Summarize...", func() {
 				w4.Show()
 				showSummarizeDialog(a, w4)
