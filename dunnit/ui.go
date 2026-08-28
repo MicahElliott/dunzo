@@ -127,6 +127,22 @@ func openInEditor(path string) {
 	}
 }
 
+// showCategoryLegend opens a static window listing every category's
+// emoji/code and one-line intended-use description (FR-06). Text
+// comes directly from Categories (categories.go), so it can't drift
+// out of sync with the actual picker options.
+func showCategoryLegend(a fyne.App) {
+	w := a.NewWindow("Dunzo: Category Legend")
+	rows := container.NewVBox()
+	for _, c := range Categories {
+		rows.Add(widget.NewLabel(c.Label() + " -- " + c.Help))
+	}
+	scroll := container.NewVScroll(rows)
+	scroll.SetMinSize(fyne.NewSize(480, 400))
+	w.SetContent(scroll)
+	w.Show()
+}
+
 func MakeUI() *fyne.App {
 	a := app.New()
 	return &a
@@ -273,6 +289,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 				showSummarizeDialog(a, w4)
 			}),
 			fyne.NewMenuItem("Settings...", func() { showSettings(a) }),
+			fyne.NewMenuItem("Category Legend...", func() { showCategoryLegend(a) }),
 			fyne.NewMenuItem("End of Day...", func() { showEODWindow(a) }),
 		)
 		desk.SetSystemTrayMenu(m)
