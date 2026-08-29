@@ -278,10 +278,14 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(input)
 		tagPopup.ShowAtPosition(pos.Add(fyne.NewPos(0, input.Size().Height)))
 		// PopUpMenu.Show() unconditionally steals keyboard focus via
-		// canvas.Focus(p), which would stop the user from continuing
-		// to type into input. Immediately refocus input so typing
-		// keeps working while the suggestion popup is visible.
-		canvas.Focus(input)
+		// canvas.Focus(p). A synchronous re-focus call right after
+		// ShowAtPosition isn't enough -- Show()'s own focus-steal
+		// seems to still win. Defer the refocus via fyne.Do so it
+		// runs after the current UI update cycle, once the popup's
+		// own Show() has finished.
+		fyne.Do(func() {
+			canvas.Focus(input)
+		})
 	}
 
 	// minsInput is an optional free-text "minutes spent" field (very
