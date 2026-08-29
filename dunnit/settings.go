@@ -38,6 +38,9 @@ func showSettings(a fyne.App) {
 	digestTime.SetText(cfg.WeeklyDigestTime)
 	digestTime.SetPlaceHolder("HH:MM")
 
+	autoDraft := widget.NewCheck("", nil)
+	autoDraft.SetChecked(cfg.AutoDraftDailySummary)
+
 	form := widget.NewForm(
 		widget.NewFormItem("Day Start (HH:MM)", dayStart),
 		widget.NewFormItem("Day End (HH:MM)", dayEnd),
@@ -45,6 +48,7 @@ func showSettings(a fyne.App) {
 		widget.NewFormItem("Lunch Time (HH:MM)", lunchTime),
 		widget.NewFormItem("Weekly Digest Day", digestDay),
 		widget.NewFormItem("Weekly Digest Time (HH:MM)", digestTime),
+		widget.NewFormItem("Auto-draft Daily Summary at EOD", autoDraft),
 	)
 	form.OnSubmit = func() {
 		minutes, err := strconv.Atoi(nudgeInterval.Text)
@@ -62,6 +66,7 @@ func showSettings(a fyne.App) {
 		newCfg.LunchTime = lunchTime.Text
 		newCfg.WeeklyDigestDay = digestDay.Selected
 		newCfg.WeeklyDigestTime = digestTime.Text
+		newCfg.AutoDraftDailySummary = autoDraft.Checked
 		if err := writeConfig(newCfg); err != nil {
 			dialog.ShowError(err, w)
 			return
@@ -71,6 +76,6 @@ func showSettings(a fyne.App) {
 	form.SubmitText = "Save"
 
 	w.SetContent(form)
-	w.Resize(fyne.NewSize(320, 240))
+	w.Resize(fyne.NewSize(320, 280))
 	w.Show()
 }

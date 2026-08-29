@@ -134,19 +134,27 @@ func showEODWindow(a fyne.App) {
 		}
 		// FR-18: draft (if not already present) today's hand-editable
 		// summary doc, now that the day's SUMMARY/PRODUCTIVITY/
-		// SENTIMENT lines above have just been recorded. Runs in the
-		// background since it shells out to gh copilot; opens in
-		// $EDITOR when ready rather than blocking Finalize Day.
-		go func() {
-			path, _, err := ensureDailySummaryDoc(time.Now())
-			if err != nil {
-				log.Println("Error drafting daily summary doc:", err)
-				return
-			}
-			if path != "" {
-				openInEditor(path)
-			}
-		}()
+		// SENTIMENT lines above have just been recorded. Gated behind
+		// AutoDraftDailySummary (default off) -- open design
+		// questions remain about EOD-vs-other trigger timing and how
+		// this doc's content should differ from Summarize's existing
+		// Day output; see docs/open-design-questions.md. Manual
+		// drafting via the "Daily Summary Doc..." tray item always
+		// works regardless of this setting. Runs in the background
+		// since it shells out to gh copilot; opens in $EDITOR when
+		// ready rather than blocking Finalize Day.
+		if LoadConfig().AutoDraftDailySummary {
+			go func() {
+				path, _, err := ensureDailySummaryDoc(time.Now())
+				if err != nil {
+					log.Println("Error drafting daily summary doc:", err)
+					return
+				}
+				if path != "" {
+					openInEditor(path)
+				}
+			}()
+		}
 		w.Close()
 	}
 

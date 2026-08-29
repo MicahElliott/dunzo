@@ -46,6 +46,16 @@ type Config struct {
 	// unprompted until explicitly configured).
 	WeeklyDigestDay  string `toml:"weekly_digest_day"`
 	WeeklyDigestTime string `toml:"weekly_digest_time"`
+
+	// AutoDraftDailySummary (FR-18) gates whether EOD's Finalize Day
+	// automatically drafts/opens the daily summary doc via gh
+	// copilot. Default false -- open design questions remain about
+	// whether EOD is even the right trigger timing, and what should
+	// differentiate the doc's content from Summarize's existing Day
+	// output (see FR-18 questions in
+	// docs/open-design-questions.md). Manual drafting via the "Daily
+	// Summary Doc..." tray item is unaffected by this flag.
+	AutoDraftDailySummary bool `toml:"auto_draft_daily_summary"`
 }
 
 // defaultConfig mirrors the values from dunnit's config-example.zsh.
