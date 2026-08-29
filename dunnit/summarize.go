@@ -109,6 +109,25 @@ func gatherLedgerTextForDate(date time.Time) string {
 	return concatLedgerFiles([]string{path})
 }
 
+// gatherLedgerTextForRange concatenates ledger content for files
+// dated within [from, to] inclusive -- used by FR-22 (year range) and
+// FR-23 (arbitrary date range), sharing the same plumbing as the
+// rolling-period/single-date variants above.
+func gatherLedgerTextForRange(from, to time.Time, categories map[string]bool) string {
+	var files []string
+	for _, path := range allLedgerFiles() {
+		date := ledgerFileDate(path)
+		if date == nil || date.Before(from) || date.After(to) {
+			continue
+		}
+		files = append(files, path)
+	}
+	if len(categories) == 0 {
+		return concatLedgerFiles(files)
+	}
+	return concatLedgerFilesFiltered(files, categories)
+}
+
 // concatLedgerFiles concatenates the content of the given ledger
 // files into one string (file path headers included, for context).
 func concatLedgerFiles(files []string) string {
@@ -129,13 +148,42 @@ func concatLedgerFiles(files []string) string {
 	return sb.String()
 }
 
-// summarizeWithCopilot shells out to `gh copilot` with a one-shot prompt
-// asking it to summarize the given ledger text into a brief impact
-// report. Requires the `gh` CLI with the Copilot extension available.
-func summarizeWithCopilot(ledgerText string) (string, error) {
-	prompt := "Summarize this ledger of daily activity entries into a brief " +
-		"impact report suitable for a standup or status update. Be concise " +
-		"and group related work together.\n\n" + ledgerText
+// concatLedgerFilesFiltered is like concatLedgerFiles, but only
+// includes lines whose category is in categories.
+func concatLedgerFilesFiltered(files []string, categories map[string]bool) string {
+	var sb strings.Builder
+	for _, path := range files {
+		f, err := os.Open(path)
+		if err != nil {
+			continue
+		}
+		var wroteHeader bool
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := scanner.Text()
+			cat, _, ok := parseLedgerLine(line)
+			if !ok || !categories[cat] {
+				continue
+			}
+			if !wroteHeader {
+				sb.WriteString("# " + filepath.Base(path) + "\n")
+				wroteHeader = true
+			}
+			sb.WriteString(line)
+			sb.WriteString("\n")
+		}
+		f.Close()
+	}
+	return sb.String()
+}
+
+// summarizeWithCopilotPrompt is like summarizeWithCopilot, but lets
+// the caller supply the full instruction text prepended before the
+// ledger content -- used by FR-22/FR-23's differently-framed prompts
+// (performance-review-flavored, private-vs-shareable) while reusing
+// the exact same gh copilot invocation plumbing.
+func summarizeWithCopilotPrompt(instructions, ledgerText string) (string, error) {
+	prompt := instructions + "\n\n" + ledgerText
 
 	cmd := exec.Command("gh", "copilot", "-p", prompt, "--silent", "--allow-all-tools")
 	out, err := cmd.CombinedOutput()
@@ -143,6 +191,16 @@ func summarizeWithCopilot(ledgerText string) (string, error) {
 		return "", fmt.Errorf("gh copilot failed: %w\n%s", err, out)
 	}
 	return string(out), nil
+}
+
+// summarizeWithCopilot shells out to `gh copilot` with a one-shot prompt
+// asking it to summarize the given ledger text into a brief impact
+// report. Requires the `gh` CLI with the Copilot extension available.
+func summarizeWithCopilot(ledgerText string) (string, error) {
+	return summarizeWithCopilotPrompt(
+		"Summarize this ledger of daily activity entries into a brief "+
+			"impact report suitable for a standup or status update. Be concise "+
+			"and group related work together.", ledgerText)
 }
 
 // showSummarizeDialog lets the user pick a period, then runs the
