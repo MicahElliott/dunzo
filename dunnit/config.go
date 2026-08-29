@@ -32,6 +32,12 @@ type Config struct {
 
 	// LunchTime is "HH:MM" for a midday goals-reminder popup.
 	LunchTime string `toml:"lunch_time"`
+
+	// RecurringMeetings is the FR-15 mini-calendar: a small,
+	// purely user-entered list of weekly recurring meeting slots
+	// (tag + day-of-week + time), used by FR-16's pre-meeting
+	// nudge. No real calendar/.ics/EventKit integration.
+	RecurringMeetings []RecurringMeeting `toml:"recurring_meeting"`
 }
 
 // defaultConfig mirrors the values from dunnit's config-example.zsh.
