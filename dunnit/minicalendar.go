@@ -249,3 +249,39 @@ func dueForPreMeetingNudge(m RecurringMeeting, now time.Time, window time.Durati
 	delta := next.Sub(now)
 	return delta > 0 && delta <= window
 }
+
+// lastOccurrence returns the most recent past occurrence of m at or
+// before now (the mirror of nextOccurrence). Used by FR-36's post-
+// meeting nudge, which looks backward instead of forward.
+func lastOccurrence(m RecurringMeeting, now time.Time) time.Time {
+	next := nextOccurrence(m, now)
+	if next.Equal(now) {
+		return next
+	}
+	// nextOccurrence never returns a time <= now, so the actual most
+	// recent past occurrence is exactly one cadence period before
+	// whatever it returns when starting the search from just after
+	// that prior occurrence. Simplest robust approach: step backward
+	// a week at a time (respecting IntervalWeeks) until we find an
+	// occurrence at or before now.
+	interval := m.IntervalWeeks
+	if interval <= 0 {
+		interval = 1
+	}
+	candidate := next.AddDate(0, 0, -7*interval)
+	for candidate.After(now) {
+		candidate = candidate.AddDate(0, 0, -7*interval)
+	}
+	return candidate
+}
+
+// dueForPostMeetingNudge reports whether m's most recent occurrence
+// ended between minAfter and maxAfter ago from now (FR-36 -- surfaced
+// shortly after a recurring meeting's scheduled time passes). Assumes
+// a nominal meeting length isn't tracked, so "ended" is approximated
+// as "started" -- good enough for a soft suggestion nudge.
+func dueForPostMeetingNudge(m RecurringMeeting, now time.Time, minAfter, maxAfter time.Duration) bool {
+	last := lastOccurrence(m, now)
+	elapsed := now.Sub(last)
+	return elapsed >= minAfter && elapsed <= maxAfter
+}

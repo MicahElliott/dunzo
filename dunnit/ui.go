@@ -528,6 +528,10 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			fyne.NewMenuItem("Recurring Meetings...", func() {
 				showMiniCalendarDialog(a, w4)
 			}),
+			fyne.NewMenuItem("Post-Meeting Capture...", func() {
+				w4.Show()
+				showPostMeetingCapture(a, w4, "")
+			}),
 			fyne.NewMenuItem("Standup Summary...", func() { showStandupExport(a) }),
 			fyne.NewMenuItem("Daily Summary Doc...", func() {
 				go func() {

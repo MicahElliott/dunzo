@@ -158,32 +158,48 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 	// still inside the window. A "#dsu" tag (FR-17) triggers the
 	// deterministic standup export instead of the generic Meeting
 	// Prep dialog; every other tag still gets Meeting Prep (FR-12).
-	firedFor := map[string]time.Time{} // "tag" -> occurrence time already nudged for
+	// The same job also checks FR-36's post-meeting capture window
+	// (~15-45 min after a meeting's start, since duration isn't
+	// tracked) and suggests that instead, independently deduped via
+	// firedPostFor.
+	firedFor := map[string]time.Time{}     // "tag" -> occurrence time already nudged for (pre-meeting)
+	firedPostFor := map[string]time.Time{} // "tag" -> occurrence time already nudged for (post-meeting)
 	_, err = s.NewJob(
 		gocron.DurationJob(15*time.Minute),
 		gocron.NewTask(func() {
 			now := time.Now()
 			cfg := LoadConfig()
 			for _, m := range cfg.RecurringMeetings {
-				if !dueForPreMeetingNudge(m, now, 15*time.Minute) {
-					continue
-				}
-				occ := nextOccurrence(m, now)
-				if fired, ok := firedFor[m.Tag]; ok && fired.Equal(occ) {
-					continue
-				}
-				firedFor[m.Tag] = occ
-				a.SendNotification(fyne.NewNotification(
-					"Dunzo", "Upcoming meeting "+m.Tag+" at "+m.Time))
-				m := m // capture for closure
-				fyne.Do(func() {
-					w.Show()
-					if strings.EqualFold(m.Tag, "#dsu") {
-						showStandupExport(a)
-					} else {
-						showMeetingPrepDialog(a, w)
+				if dueForPreMeetingNudge(m, now, 15*time.Minute) {
+					occ := nextOccurrence(m, now)
+					if fired, ok := firedFor[m.Tag]; !ok || !fired.Equal(occ) {
+						firedFor[m.Tag] = occ
+						a.SendNotification(fyne.NewNotification(
+							"Dunzo", "Upcoming meeting "+m.Tag+" at "+m.Time))
+						m := m // capture for closure
+						fyne.Do(func() {
+							w.Show()
+							if strings.EqualFold(m.Tag, "#dsu") {
+								showStandupExport(a)
+							} else {
+								showMeetingPrepDialog(a, w)
+							}
+						})
 					}
-				})
+				}
+				if dueForPostMeetingNudge(m, now, 15*time.Minute, 45*time.Minute) {
+					occ := lastOccurrence(m, now)
+					if fired, ok := firedPostFor[m.Tag]; !ok || !fired.Equal(occ) {
+						firedPostFor[m.Tag] = occ
+						a.SendNotification(fyne.NewNotification(
+							"Dunzo", "Post-meeting capture for "+m.Tag+"?"))
+						m := m // capture for closure
+						fyne.Do(func() {
+							w.Show()
+							showPostMeetingCapture(a, w, m.Tag)
+						})
+					}
+				}
 			}
 		}),
 	)
