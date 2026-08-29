@@ -453,6 +453,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			w3.Show()
 
 		} ),
+		widget.NewButton("Meeting Prep...", func() { showMeetingPrepDialog(a, w4) }),
 	)
 
 	content := container.NewVBox(
@@ -494,6 +495,10 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			}),
 			fyne.NewMenuItem("Settings...", func() { showSettings(a) }),
 			fyne.NewMenuItem("Category Legend...", func() { showCategoryLegend(a) }),
+			fyne.NewMenuItem("Meeting Prep...", func() {
+				w4.Show()
+				showMeetingPrepDialog(a, w4)
+			}),
 			fyne.NewMenuItem("Undo/Edit Last Entry...", func() {
 				showUndoEditLastEntry(a, func() {
 					refreshLastDunnit()
