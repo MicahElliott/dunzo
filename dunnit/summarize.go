@@ -21,6 +21,7 @@ type summaryPeriod string
 
 const (
 	periodDay     summaryPeriod = "Day"
+	periodWeek    summaryPeriod = "Week"
 	periodMonth   summaryPeriod = "Month"
 	periodQuarter summaryPeriod = "Quarter"
 )
@@ -32,6 +33,8 @@ func ledgerFilesFor(period summaryPeriod, now time.Time) []string {
 	switch period {
 	case periodDay:
 		cutoff = now.AddDate(0, 0, -1)
+	case periodWeek:
+		cutoff = now.AddDate(0, 0, -7)
 	case periodMonth:
 		cutoff = now.AddDate(0, -1, 0)
 	case periodQuarter:
@@ -145,7 +148,7 @@ func summarizeWithCopilot(ledgerText string) (string, error) {
 // showSummarizeDialog lets the user pick a period, then runs the
 // summary and displays the result in a new window.
 func showSummarizeDialog(a fyne.App, parent fyne.Window) {
-	options := []string{string(periodDay), string(periodMonth), string(periodQuarter)}
+	options := []string{string(periodDay), string(periodWeek), string(periodMonth), string(periodQuarter)}
 	periodSelect := widget.NewSelect(options, nil)
 	periodSelect.SetSelected(string(periodDay))
 

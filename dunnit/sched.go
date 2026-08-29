@@ -180,6 +180,54 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 		fmt.Println("Error scheduling pre-meeting nudge job:", err)
 	}
 
+	// FR-19: proactive weekly digest, fires once on the configured
+	// weekly_digest_day/time (e.g. Friday 16:00) and shows a Week-
+	// period Summarize report unprompted. Disabled by default (no
+	// weekly_digest_day configured) since it shells out to gh copilot
+	// on a schedule -- opt-in via Settings/config.toml. The monthly
+	// version is intentionally not a separate mechanism here; it's
+	// folded into FR-14's SOM wizard once that exists.
+	if wd, ok := parseWeekday(cfg.WeeklyDigestDay); ok {
+		if dh, dm := parseHM(cfg.WeeklyDigestTime); dh != 0 || dm != 0 {
+			_, err = s.NewJob(
+				gocron.WeeklyJob(1, gocron.NewWeekdays(wd), gocron.NewAtTimes(gocron.NewAtTime(uint(dh), uint(dm), 0))),
+				gocron.NewTask(func() {
+					fyne.Do(func() {
+						w.Show()
+						runSummarize(a, periodWeek)
+					})
+				}),
+			)
+			if err != nil {
+				fmt.Println("Error scheduling weekly digest job:", err)
+			}
+		}
+	}
+
 	s.Start()
 	return s
+}
+
+// parseWeekday parses a day-name string ("Monday".."Sunday", case-
+// insensitive) into a time.Weekday. ok is false for an empty or
+// unrecognized string (treated as "digest not configured").
+func parseWeekday(s string) (day time.Weekday, ok bool) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "sunday":
+		return time.Sunday, true
+	case "monday":
+		return time.Monday, true
+	case "tuesday":
+		return time.Tuesday, true
+	case "wednesday":
+		return time.Wednesday, true
+	case "thursday":
+		return time.Thursday, true
+	case "friday":
+		return time.Friday, true
+	case "saturday":
+		return time.Saturday, true
+	default:
+		return 0, false
+	}
 }

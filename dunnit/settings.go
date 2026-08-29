@@ -31,11 +31,20 @@ func showSettings(a fyne.App) {
 	lunchTime := widget.NewEntry()
 	lunchTime.SetText(cfg.LunchTime)
 
+	digestDay := widget.NewSelect([]string{"", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}, nil)
+	digestDay.SetSelected(cfg.WeeklyDigestDay)
+
+	digestTime := widget.NewEntry()
+	digestTime.SetText(cfg.WeeklyDigestTime)
+	digestTime.SetPlaceHolder("HH:MM")
+
 	form := widget.NewForm(
 		widget.NewFormItem("Day Start (HH:MM)", dayStart),
 		widget.NewFormItem("Day End (HH:MM)", dayEnd),
 		widget.NewFormItem("Nudge Interval (minutes)", nudgeInterval),
 		widget.NewFormItem("Lunch Time (HH:MM)", lunchTime),
+		widget.NewFormItem("Weekly Digest Day", digestDay),
+		widget.NewFormItem("Weekly Digest Time (HH:MM)", digestTime),
 	)
 	form.OnSubmit = func() {
 		minutes, err := strconv.Atoi(nudgeInterval.Text)
@@ -43,12 +52,16 @@ func showSettings(a fyne.App) {
 			dialog.ShowError(fmt.Errorf("Nudge Interval must be a number: %w", err), w)
 			return
 		}
-		newCfg := Config{
-			DayStart:             dayStart.Text,
-			DayEnd:               dayEnd.Text,
-			NudgeIntervalMinutes: minutes,
-			LunchTime:            lunchTime.Text,
-		}
+		// Start from the loaded config rather than a blank Config{}
+		// so fields not represented in this form (e.g.
+		// RecurringMeetings, FR-15) aren't silently wiped out on save.
+		newCfg := cfg
+		newCfg.DayStart = dayStart.Text
+		newCfg.DayEnd = dayEnd.Text
+		newCfg.NudgeIntervalMinutes = minutes
+		newCfg.LunchTime = lunchTime.Text
+		newCfg.WeeklyDigestDay = digestDay.Selected
+		newCfg.WeeklyDigestTime = digestTime.Text
 		if err := writeConfig(newCfg); err != nil {
 			dialog.ShowError(err, w)
 			return
@@ -58,6 +71,6 @@ func showSettings(a fyne.App) {
 	form.SubmitText = "Save"
 
 	w.SetContent(form)
-	w.Resize(fyne.NewSize(320, 180))
+	w.Resize(fyne.NewSize(320, 240))
 	w.Show()
 }

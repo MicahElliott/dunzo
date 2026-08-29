@@ -38,6 +38,14 @@ type Config struct {
 	// (tag + day-of-week + time), used by FR-16's pre-meeting
 	// nudge. No real calendar/.ics/EventKit integration.
 	RecurringMeetings []RecurringMeeting `toml:"recurring_meeting"`
+
+	// WeeklyDigestDay/Time (FR-19) configure when the proactive
+	// weekly digest nudge fires, e.g. "Friday" "16:00". Empty
+	// DigestDay disables the nudge (default: disabled, since it
+	// shells out to gh copilot and Micah may not want it firing
+	// unprompted until explicitly configured).
+	WeeklyDigestDay  string `toml:"weekly_digest_day"`
+	WeeklyDigestTime string `toml:"weekly_digest_time"`
 }
 
 // defaultConfig mirrors the values from dunnit's config-example.zsh.
