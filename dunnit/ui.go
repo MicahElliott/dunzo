@@ -505,6 +505,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 					refreshOpenItems()
 				})
 			}),
+			fyne.NewMenuItem("Start of Day...", func() { showSODWindow(a) }),
 			fyne.NewMenuItem("End of Day...", func() { showEODWindow(a) }),
 		)
 		desk.SetSystemTrayMenu(m)

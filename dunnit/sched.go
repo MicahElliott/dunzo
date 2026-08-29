@@ -95,6 +95,29 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 		}
 	}
 
+	// FR-13: Start-of-Day nudge, fires once per workday near
+	// cfg.DayStart, showing today's open TODOs/GOALs (readback) and a
+	// chance to add more before the day gets going.
+	if sh, sm := parseHM(cfg.DayStart); sh != 0 || sm != 0 {
+		_, err = s.NewJob(
+			gocron.DailyJob(1, gocron.NewAtTimes(gocron.NewAtTime(uint(sh), uint(sm), 0))),
+			gocron.NewTask(func() {
+				now := time.Now()
+				if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
+					return
+				}
+				a.SendNotification(fyne.NewNotification(
+					"Dunzo", "Good morning! Here's where things stand."))
+				fyne.Do(func() {
+					showSODWindow(a)
+				})
+			}),
+		)
+		if err != nil {
+			fmt.Println("Error scheduling start-of-day job:", err)
+		}
+	}
+
 	if eh, em := parseHM(cfg.DayEnd); eh != 0 || em != 0 {
 		_, err = s.NewJob(
 			gocron.DailyJob(1, gocron.NewAtTimes(gocron.NewAtTime(uint(eh), uint(em), 0))),
