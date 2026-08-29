@@ -359,6 +359,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		refreshOpenItems()
 	}
 	input.OnSubmitted = func(string) { saveEntry() }
+	minsInput.OnSubmitted = func(string) { saveEntry() }
 
 	buttons := container.NewHBox(
 		widget.NewButton("Save", saveEntry),
