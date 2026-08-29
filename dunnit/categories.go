@@ -70,7 +70,6 @@ var Categories = []Category{
 	{"💡", "IDEA", "A new idea worth capturing.", "now", ""},
 	{"❓", "QUESTION", "An open question to follow up on.", "now", ""},
 	{"🧠", "TIL", "Today I Learned -- something new you picked up.", "now", "positive"},
-	{"📅", "MEETING", "Scratch agenda-builder notes for an upcoming meeting (tag-scoped).", "now", ""},
 	{"⏳", "WAITING", "Blocked on someone/something else; not actionable right now.", "now", ""},
 	{"🙌", "KUDOS", "Recognition given to someone else, or received from someone else.", "now", "positive"},
 	{"🏆", "WIN", "A win worth celebrating.", "now", "positive"},
@@ -80,6 +79,7 @@ var Categories = []Category{
 	// plan: future-facing
 	{"📌", "TODO", "A small, tight, near-term item -- actively encouraged.", "plan", ""},
 	{"🎯", "GOAL", "A bigger overarching aim, reviewed on a longer cadence (not daily).", "plan", ""},
+	{"📅", "MEETING", "Scratch agenda-builder notes for an upcoming meeting (tag-scoped).", "plan", ""},
 	{"🕰️", "SOMEDAY", "Something you might want to do eventually, not now (also where stalled TODOs/GOALs land).", "plan", ""},
 	{"🏎️", "OPTIMIZE", "Something working but worth improving/speeding up.", "plan", ""},
 

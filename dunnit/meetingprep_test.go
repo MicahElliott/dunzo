@@ -73,7 +73,7 @@ func TestPullTaggedEntries(t *testing.T) {
 	})
 
 	since := today.AddDate(0, 0, -14)
-	got := pullTaggedEntries("#boss", since)
+	got := pullTaggedEntries("#boss", since, nil)
 	if len(got) != 2 {
 		t.Fatalf("expected 2 matching entries within lookback, got %d: %+v", len(got), got)
 	}
@@ -81,5 +81,33 @@ func TestPullTaggedEntries(t *testing.T) {
 		if e.date.Before(since) {
 			t.Errorf("entry %+v is before the since cutoff", e)
 		}
+	}
+}
+
+func TestPullTaggedEntries_CategoryFilter(t *testing.T) {
+	withTempDunzoDir(t)
+
+	today := time.Now()
+	writeLedgerFileForDate(t, today, []string{
+		"[09:00:00] MEETING #boss discussed roadmap",
+		"[10:00:00] DONE mentioned #boss in passing",
+		"[11:00:00] IDEA #boss maybe try this",
+	})
+
+	since := today.AddDate(0, 0, -14)
+
+	got := pullTaggedEntries("#boss", since, categoryFilterSet("MEETING"))
+	if len(got) != 1 {
+		t.Fatalf("MEETING filter: expected 1 entry, got %d: %+v", len(got), got)
+	}
+
+	got = pullTaggedEntries("#boss", since, categoryFilterSet("Related"))
+	if len(got) != 2 {
+		t.Fatalf("Related filter: expected 2 entries (MEETING+IDEA), got %d: %+v", len(got), got)
+	}
+
+	got = pullTaggedEntries("#boss", since, categoryFilterSet("All"))
+	if len(got) != 3 {
+		t.Fatalf("All filter: expected 3 entries, got %d: %+v", len(got), got)
 	}
 }

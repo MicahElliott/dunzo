@@ -32,13 +32,39 @@ type taggedEntry struct {
 	line string
 }
 
+// relatedCategories are the categories considered "Related" to a
+// meeting/tag in Meeting Prep's history filter -- broader than just
+// MEETING itself, but not everything.
+var relatedCategories = map[string]bool{
+	"MEETING": true, "IDEA": true, "QUESTION": true, "WIN": true,
+	"RISK": true, "GOAL": true, "IMPACT": true, "CAREER": true,
+}
+
+// categoryFilterSet returns the set of category codes matching a
+// Meeting Prep filter choice: "MEETING" (just that one), "Related"
+// (relatedCategories, which includes MEETING), or "All" (nil,
+// meaning no filtering -- pullTaggedEntries treats a nil/empty set as
+// "match any category").
+func categoryFilterSet(choice string) map[string]bool {
+	switch choice {
+	case "MEETING":
+		return map[string]bool{"MEETING": true}
+	case "Related":
+		return relatedCategories
+	default: // "All"
+		return nil
+	}
+}
+
 // pullTaggedEntries scans all ledger files dated on/after since,
 // returning every line containing the given tag (as a whole #tag
 // token, matched via extractTags) in chronological order (oldest
-// first). Used by Meeting Prep's history pull -- lets the user see
-// what's accumulated under a tag like "#boss" over recent weeks
-// without altering the source files.
-func pullTaggedEntries(tag string, since time.Time) []taggedEntry {
+// first). If categories is non-nil, only lines whose category is in
+// that set are included; nil/empty means match any category. Used by
+// Meeting Prep's history pull -- lets the user see what's accumulated
+// under a tag like "#boss" over recent weeks without altering the
+// source files.
+func pullTaggedEntries(tag string, since time.Time, categories map[string]bool) []taggedEntry {
 	var out []taggedEntry
 	for _, path := range allLedgerFiles() {
 		date := ledgerFileDate(path)
@@ -52,6 +78,10 @@ func pullTaggedEntries(tag string, since time.Time) []taggedEntry {
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
 			line := scanner.Text()
+			cat, _, ok := parseLedgerLine(line)
+			if ok && len(categories) > 0 && !categories[cat] {
+				continue
+			}
 			for _, t := range extractTags(line) {
 				if strings.EqualFold(t, tag) {
 					out = append(out, taggedEntry{date: *date, line: line})
@@ -89,6 +119,9 @@ func showMeetingPrepDialog(a fyne.App, parent fyne.Window) {
 	weeksSelect := widget.NewSelect([]string{"1", "2", "3", "4", "12"}, nil)
 	weeksSelect.SetSelected("2")
 
+	catFilterSelect := widget.NewSelect([]string{"MEETING", "Related", "All"}, nil)
+	catFilterSelect.SetSelected("MEETING")
+
 	history := widget.NewMultiLineEntry()
 	history.SetPlaceHolder("Enter a tag above and click Refresh to pull recent entries...")
 	history.SetMinRowsVisible(8)
@@ -104,7 +137,8 @@ func showMeetingPrepDialog(a fyne.App, parent fyne.Window) {
 			weeks = 2
 		}
 		since := time.Now().AddDate(0, 0, -7*weeks)
-		entries := lastN(pullTaggedEntries(tag, since), 8)
+		categories := categoryFilterSet(catFilterSelect.Selected)
+		entries := lastN(pullTaggedEntries(tag, since, categories), 8)
 		if len(entries) == 0 {
 			history.SetText("(no entries found for " + tag + " in the last " + weeksSelect.Selected + " week(s))")
 			return
@@ -118,6 +152,7 @@ func showMeetingPrepDialog(a fyne.App, parent fyne.Window) {
 	refreshBtn := widget.NewButton("Refresh", refreshHistory)
 	tagEntry.OnSubmitted = func(string) { refreshHistory() }
 	weeksSelect.OnChanged = func(string) { refreshHistory() }
+	catFilterSelect.OnChanged = func(string) { refreshHistory() }
 
 	noteEntry := widget.NewMultiLineEntry()
 	noteEntry.SetPlaceHolder("New agenda note for this meeting...")
@@ -125,7 +160,7 @@ func showMeetingPrepDialog(a fyne.App, parent fyne.Window) {
 
 	content := container.NewVBox(
 		widget.NewLabel("Meeting Prep"),
-		container.NewBorder(nil, nil, nil, container.NewHBox(weeksSelect, refreshBtn), tagEntry),
+		container.NewBorder(nil, nil, nil, container.NewHBox(catFilterSelect, weeksSelect, refreshBtn), tagEntry),
 		widget.NewLabel("Recent entries for this tag (editable scratch view -- does not alter the ledger):"),
 		history,
 		widget.NewLabel("Add a new note:"),
