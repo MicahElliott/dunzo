@@ -9,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 
 	"log"
 	"os"
@@ -219,7 +220,13 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 	green := color.NRGBA{R: 0, G: 180, B: 0, A: 255}
 	colorText := canvas.NewText("I colored this", green)
-	lastDunnitLabel := widget.NewLabel("Last Dunnit: " + getLastDunnit())
+	// lastDunnitLabel uses markdown bold on the "Last Dunnit:" prefix
+	// to visually separate it from the actual recorded text.
+	// refreshLastDunnit keeps all call sites in sync with that format.
+	lastDunnitLabel := widget.NewRichTextFromMarkdown("**Last Dunnit:** " + getLastDunnit())
+	refreshLastDunnit := func() {
+		lastDunnitLabel.ParseMarkdown("**Last Dunnit:** " + getLastDunnit())
+	}
 	commonTopics := getCommonTopics()
 
 	// TODO show day's GOALs
@@ -230,12 +237,12 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 	// minsInput is an optional free-text "minutes spent" field (very
 	// informal time tracking). When non-empty and numeric, its value
-	// is appended to the recorded text as " @Nm" (e.g. "@20m"). Most
-	// meaningful for temporal/effort-bearing categories (see
-	// IsTimeTrackable) but not hard-restricted to them.
+	// is appended to the recorded text as " @Nm" (e.g. "@20m"). Uses
+	// a short placeholder ("m") and a fixed minimum width so it
+	// doesn't get visually squeezed at Dunzo's default window width.
 	minsInput := widget.NewEntry()
-	minsInput.SetPlaceHolder("mins")
-	minsInput.Resize(fyne.NewSize(50, minsInput.MinSize().Height))
+	minsInput.SetPlaceHolder("m")
+	minsWrapper := container.New(layout.NewGridWrapLayout(fyne.NewSize(48, minsInput.MinSize().Height)), minsInput)
 
 	// withMins appends " @Nm" to text if minsInput has a valid
 	// positive integer in it; otherwise returns text unchanged.
@@ -253,6 +260,15 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 	selectedCat := "DONE"
 	// widget.NewSelectEntry
+	//
+	// Note: Fyne's widget.Select renders its selected-text label via
+	// an internal RichText segment that it resets (alignment, color)
+	// on every refresh, with no exposed hook to set TextStyle.
+	// Monospace -- so unlike the Upcoming list and Category Legend
+	// (both of which use canvas.Text/widget.Label directly, which we
+	// do control), this live picker can't be made monospace without
+	// forking/reimplementing Select's renderer. Not worth that cost
+	// for a cosmetic detail; left in the default font.
 	category := widget.NewSelect(CategoryLabelsForGroup("now"),
 		func(cat string) { fmt.Println("saw a category:", cat)
 			res := strings.Split(cat, " ")
@@ -273,17 +289,27 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		})
 	groupFilter.SetSelected("Now")
 
-	categoryRow := container.NewBorder(nil, nil, groupFilter, nil, category)
-	doneWrapper := container.NewBorder(nil, nil, categoryRow, minsInput, input)
+	// Dunzo aims to be a mouseless/mouse-optional UI -- keyboard-only
+	// operation should always be possible. IMPORTANT: Fyne's focus
+	// traversal (Tab/Shift+Tab) follows each container's *Objects
+	// slice order*, not visual/layout position. container.NewBorder's
+	// constructor appends objects in the fixed order (center content
+	// first, then top, bottom, left, right) regardless of which
+	// visual position they occupy -- so a NewBorder-based row can
+	// easily end up with Tab order that doesn't match what's on
+	// screen. Prefer container.NewHBox/NewVBox (whose Objects order
+	// always matches argument/visual order) for any row where tab
+	// order matters, as done below.
+	doneWrapper := container.NewHBox(groupFilter, category, input, minsWrapper)
 
 	fmt.Println(input.MinSize())
 
 	// openItemsBox displays currently-open TODO/GOAL lines together
 	// under one "Upcoming" heading (FR-07), each with "Done" (convert
-	// to DONE) and "Stall" (defer to SOMEDAY, keeping the list from
+	// to DONE) and "Postpone" (defer to SOMEDAY, keeping the list from
 	// growing unbounded) actions. refreshOpenItems rebuilds it from
 	// the current ledger contents; called after any save/convert/
-	// stall action so the list stays in sync.
+	// postpone action so the list stays in sync.
 	openItemsBox := container.NewVBox()
 	var refreshOpenItems func()
 	refreshOpenItems = func() {
@@ -300,12 +326,14 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			catLabel.TextStyle = fyne.TextStyle{Monospace: true}
 			row := container.NewBorder(nil, nil, catLabel,
 				container.NewHBox(
-					widget.NewButton("Stall", func() {
-						recordStalled(item)
+					widget.NewButton("Postpone", func() {
+						recordPostponed(item)
+						refreshLastDunnit()
 						refreshOpenItems()
 					}),
 					widget.NewButton("Done", func() {
 						recordConvertedDone(item)
+						refreshLastDunnit()
 						refreshOpenItems()
 					}),
 				),
@@ -323,7 +351,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		recordActivity(withMins(input.Text), selectedCat) // TODO trim emoji off front, and shorten to 4-char code
 		input.SetText("")
 		minsInput.SetText("")
-		lastDunnitLabel.SetText("Last Dunnit: " + getLastDunnit())
+		refreshLastDunnit()
 		refreshOpenItems()
 	}
 	input.OnSubmitted = func(string) { saveEntry() }
@@ -339,7 +367,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			if txt := lastEntryText(); txt != "" {
 				recordActivity(withMins(txt), "ONGOING")
 				minsInput.SetText("")
-				lastDunnitLabel.SetText("Last Dunnit: " + getLastDunnit())
+				refreshLastDunnit()
 				refreshOpenItems()
 			}
 		}),
@@ -372,7 +400,12 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		// widget.NewLabel(colorText),
 		widget.NewLabel("Common topics you use:" + commonTopics),
 		colorText,
-		lastDunnitLabel,
+		container.NewHBox(lastDunnitLabel, widget.NewButton("Edit", func() {
+			showUndoEditLastEntry(a, func() {
+				refreshLastDunnit()
+				refreshOpenItems()
+			})
+		})),
 		widget.NewLabel("What would you like to record?"),
 		doneWrapper,
 		// category, input,
@@ -404,7 +437,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			fyne.NewMenuItem("Category Legend...", func() { showCategoryLegend(a) }),
 			fyne.NewMenuItem("Undo/Edit Last Entry...", func() {
 				showUndoEditLastEntry(a, func() {
-					lastDunnitLabel.SetText("Last Dunnit: " + getLastDunnit())
+					refreshLastDunnit()
 					refreshOpenItems()
 				})
 			}),

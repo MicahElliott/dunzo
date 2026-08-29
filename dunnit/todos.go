@@ -13,7 +13,7 @@ type OpenItem struct {
 // resolvingCategories are the categories a TODO/GOAL item can be
 // "resolved" into from the Upcoming list, and what button triggers
 // each: DONE via the "Done" button (actually completed), SOMEDAY via
-// the "Stall" button (deliberately deferred rather than pretending
+// the "Postpone" button (deliberately deferred rather than pretending
 // it's done -- see FR-07 follow-up). Both leave the original line
 // untouched (append-only ledger design) and are recognized by
 // parseOpenItems as removing the item from the open/Upcoming list.
@@ -40,8 +40,8 @@ func parseLedgerLine(line string) (category, text string, ok bool) {
 }
 
 // parseOpenItems scans ledger lines for TODO/GOAL entries that have
-// not yet been resolved (converted to DONE or stalled to SOMEDAY, via
-// recordResolved), in first-seen order.
+// not yet been resolved (converted to DONE or postponed to SOMEDAY,
+// via recordConvertedDone/recordPostponed), in first-seen order.
 func parseOpenItems(lines []string) []OpenItem {
 	var open []OpenItem
 	resolved := make(map[string]bool) // "CATEGORY\x00text" -> true
@@ -93,10 +93,10 @@ func recordConvertedDone(item OpenItem) {
 	recordActivity(item.Text+convertedSuffix(item.Category), "DONE")
 }
 
-// recordStalled logs a SOMEDAY entry referencing an original
+// recordPostponed logs a SOMEDAY entry referencing an original
 // TODO/GOAL item's text, marking it as resolved without pretending it
 // was completed -- for deliberately deferring an item so the Upcoming
 // list doesn't grow unbounded. The original line is left untouched.
-func recordStalled(item OpenItem) {
+func recordPostponed(item OpenItem) {
 	recordActivity(item.Text+convertedSuffix(item.Category), "SOMEDAY")
 }
