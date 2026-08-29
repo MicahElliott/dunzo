@@ -1,7 +1,12 @@
 package dun
 
 import (
+	"bufio"
+	"os"
+	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -19,38 +24,126 @@ func normalizeTag(s string) string {
 	return "#" + s
 }
 
-// showMeetingPrepDialog prompts for a tag (e.g. "#jeff") and a
-// free-text note, then logs a MEETING entry under that tag to
-// today's ledger (FR-11). This is the capture half of the
-// prep-now/agenda-later workflow -- FR-12 later pulls these back out
-// grouped by tag as a ready-made agenda.
+// taggedEntry is one ledger line matched by pullTaggedEntries, along
+// with the date it came from (parsed from its source file's name) so
+// results across multiple files can be sorted chronologically.
+type taggedEntry struct {
+	date time.Time
+	line string
+}
+
+// pullTaggedEntries scans all ledger files dated on/after since,
+// returning every line containing the given tag (as a whole #tag
+// token, matched via extractTags) in chronological order (oldest
+// first). Used by Meeting Prep's history pull -- lets the user see
+// what's accumulated under a tag like "#boss" over recent weeks
+// without altering the source files.
+func pullTaggedEntries(tag string, since time.Time) []taggedEntry {
+	var out []taggedEntry
+	for _, path := range allLedgerFiles() {
+		date := ledgerFileDate(path)
+		if date == nil || date.Before(since) {
+			continue
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			continue
+		}
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := scanner.Text()
+			for _, t := range extractTags(line) {
+				if strings.EqualFold(t, tag) {
+					out = append(out, taggedEntry{date: *date, line: line})
+					break
+				}
+			}
+		}
+		f.Close()
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].date.Before(out[j].date) })
+	return out
+}
+
+// lastN returns the last n elements of entries (or all of them if
+// there are fewer than n).
+func lastN(entries []taggedEntry, n int) []taggedEntry {
+	if len(entries) <= n {
+		return entries
+	}
+	return entries[len(entries)-n:]
+}
+
+// showMeetingPrepDialog shows recent history for a tag (e.g. "#boss")
+// -- the last ~8 ledger entries containing that tag, within a
+// user-chosen lookback window -- alongside a fresh note field that
+// still logs a new MEETING entry under the tag on Save (FR-11). The
+// history box is editable for the user's own scratch/annotation use,
+// but editing it never writes back to the original ledger files
+// (append-only design preserved) -- only the note field's Save action
+// writes anything.
 func showMeetingPrepDialog(a fyne.App, parent fyne.Window) {
 	tagEntry := widget.NewEntry()
 	tagEntry.SetPlaceHolder("#tag (e.g. #jeff, #boss)")
 
+	weeksSelect := widget.NewSelect([]string{"1", "2", "3", "4", "12"}, nil)
+	weeksSelect.SetSelected("2")
+
+	history := widget.NewMultiLineEntry()
+	history.SetPlaceHolder("Enter a tag above and click Refresh to pull recent entries...")
+	history.SetMinRowsVisible(8)
+
+	refreshHistory := func() {
+		tag := normalizeTag(tagEntry.Text)
+		if tag == "" {
+			history.SetText("")
+			return
+		}
+		weeks, err := strconv.Atoi(weeksSelect.Selected)
+		if err != nil || weeks <= 0 {
+			weeks = 2
+		}
+		since := time.Now().AddDate(0, 0, -7*weeks)
+		entries := lastN(pullTaggedEntries(tag, since), 8)
+		if len(entries) == 0 {
+			history.SetText("(no entries found for " + tag + " in the last " + weeksSelect.Selected + " week(s))")
+			return
+		}
+		var lines []string
+		for _, e := range entries {
+			lines = append(lines, e.line)
+		}
+		history.SetText(strings.Join(lines, "\n"))
+	}
+	refreshBtn := widget.NewButton("Refresh", refreshHistory)
+	tagEntry.OnSubmitted = func(string) { refreshHistory() }
+	weeksSelect.OnChanged = func(string) { refreshHistory() }
+
 	noteEntry := widget.NewMultiLineEntry()
-	noteEntry.SetPlaceHolder("Agenda note for this meeting...")
+	noteEntry.SetPlaceHolder("New agenda note for this meeting...")
 	noteEntry.SetMinRowsVisible(3)
 
 	content := container.NewVBox(
 		widget.NewLabel("Meeting Prep"),
-		tagEntry,
+		container.NewBorder(nil, nil, nil, container.NewHBox(weeksSelect, refreshBtn), tagEntry),
+		widget.NewLabel("Recent entries for this tag (editable scratch view -- does not alter the ledger):"),
+		history,
+		widget.NewLabel("Add a new note:"),
 		noteEntry,
 	)
 
-	d := dialog.NewCustomConfirm("Meeting Prep", "Save", "Cancel", content,
+	d := dialog.NewCustomConfirm("Meeting Prep", "Save Note", "Close", content,
 		func(ok bool) {
 			if !ok {
 				return
 			}
-			tag := strings.TrimSpace(tagEntry.Text)
+			tag := normalizeTag(tagEntry.Text)
 			note := strings.TrimSpace(noteEntry.Text)
 			if tag == "" || note == "" {
 				return
 			}
-			tag = normalizeTag(tag)
 			recordActivity(tag+" "+note, "MEETING")
 		}, parent)
-	d.Resize(fyne.NewSize(420, 260))
+	d.Resize(fyne.NewSize(480, 480))
 	d.Show()
 }
