@@ -64,6 +64,9 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 			if last := LastActivityAt(); !last.IsZero() && now.Sub(last) < intervalDuration {
 				return
 			}
+			if !SnoozedUntil().IsZero() {
+				return
+			}
 			a.SendNotification(fyne.NewNotification(
 				"Dunzo", "What are you working on?"))
 			fyne.Do(func() {

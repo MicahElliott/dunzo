@@ -60,6 +60,27 @@ func LastActivityAt() time.Time {
 	return lastActivityAt
 }
 
+// snoozedUntil tracks a "not now, remind me later" request (FR-26) --
+// while non-zero and in the future, the periodic capture nudge
+// (sched.go) skips firing. Doesn't affect other nudges (SOD/EOD/
+// meeting/etc), only the recurring "what are you working on?" one.
+var snoozedUntil time.Time
+
+// Snooze suppresses the next periodic capture nudge(s) until now+d
+// (FR-26).
+func Snooze(d time.Duration) {
+	snoozedUntil = time.Now().Add(d)
+}
+
+// SnoozedUntil returns the current snooze expiry (zero if not
+// snoozed / already expired).
+func SnoozedUntil() time.Time {
+	if time.Now().After(snoozedUntil) {
+		return time.Time{}
+	}
+	return snoozedUntil
+}
+
 func recordActivity(text, category string) {
 	log.Println("Content was:", text)
 	fpath, fname := getLedger()
@@ -471,6 +492,10 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 		} ),
 		widget.NewButton("Meeting Prep...", func() { showMeetingPrepDialog(a, w4) }),
+		widget.NewButton("Snooze 15m", func() {
+			Snooze(15 * time.Minute)
+			w4.Hide()
+		}),
 	)
 
 	content := container.NewVBox(
