@@ -138,6 +138,42 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 		}
 	}
 
+	// FR-16: pre-meeting nudge, checking every 15 min (per Micah's
+	// call -- simplest fixed interval, not tied to NudgeIntervalMinutes)
+	// whether any FR-15 recurring meeting's next occurrence starts
+	// within the next ~15 min. firedFor dedupes so the same occurrence
+	// doesn't nudge repeatedly across multiple 15-min checks while
+	// still inside the window. TODO(FR-17): once a standup export
+	// exists, special-case a configurable "standup" tag (e.g. #dsu) to
+	// show that instead of the generic Meeting Prep dialog.
+	firedFor := map[string]time.Time{} // "tag" -> occurrence time already nudged for
+	_, err = s.NewJob(
+		gocron.DurationJob(15*time.Minute),
+		gocron.NewTask(func() {
+			now := time.Now()
+			cfg := LoadConfig()
+			for _, m := range cfg.RecurringMeetings {
+				if !dueForPreMeetingNudge(m, now, 15*time.Minute) {
+					continue
+				}
+				occ := nextOccurrence(m, now)
+				if fired, ok := firedFor[m.Tag]; ok && fired.Equal(occ) {
+					continue
+				}
+				firedFor[m.Tag] = occ
+				a.SendNotification(fyne.NewNotification(
+					"Dunzo", "Upcoming meeting "+m.Tag+" at "+m.Time))
+				fyne.Do(func() {
+					w.Show()
+					showMeetingPrepDialog(a, w)
+				})
+			}
+		}),
+	)
+	if err != nil {
+		fmt.Println("Error scheduling pre-meeting nudge job:", err)
+	}
+
 	s.Start()
 	return s
 }

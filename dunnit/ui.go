@@ -507,6 +507,9 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			}),
 			fyne.NewMenuItem("Start of Day...", func() { showSODWindow(a) }),
 			fyne.NewMenuItem("End of Day...", func() { showEODWindow(a) }),
+			fyne.NewMenuItem("Recurring Meetings...", func() {
+				showMiniCalendarDialog(a, w4)
+			}),
 		)
 		desk.SetSystemTrayMenu(m)
 	}
