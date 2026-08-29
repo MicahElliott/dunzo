@@ -545,6 +545,14 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 				w4.Show()
 				showSearchDialog(a, w4)
 			}),
+			fyne.NewMenuItem("Annual Review...", func() {
+				w4.Show()
+				showAnnualReviewDialog(a, w4)
+			}),
+			fyne.NewMenuItem("Status Report...", func() {
+				w4.Show()
+				showStatusReportDialog(a, w4)
+			}),
 		)
 		desk.SetSystemTrayMenu(m)
 	}
