@@ -2,6 +2,7 @@ package dun
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -143,9 +144,9 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 	// whether any FR-15 recurring meeting's next occurrence starts
 	// within the next ~15 min. firedFor dedupes so the same occurrence
 	// doesn't nudge repeatedly across multiple 15-min checks while
-	// still inside the window. TODO(FR-17): once a standup export
-	// exists, special-case a configurable "standup" tag (e.g. #dsu) to
-	// show that instead of the generic Meeting Prep dialog.
+	// still inside the window. A "#dsu" tag (FR-17) triggers the
+	// deterministic standup export instead of the generic Meeting
+	// Prep dialog; every other tag still gets Meeting Prep (FR-12).
 	firedFor := map[string]time.Time{} // "tag" -> occurrence time already nudged for
 	_, err = s.NewJob(
 		gocron.DurationJob(15*time.Minute),
@@ -163,9 +164,14 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 				firedFor[m.Tag] = occ
 				a.SendNotification(fyne.NewNotification(
 					"Dunzo", "Upcoming meeting "+m.Tag+" at "+m.Time))
+				m := m // capture for closure
 				fyne.Do(func() {
 					w.Show()
-					showMeetingPrepDialog(a, w)
+					if strings.EqualFold(m.Tag, "#dsu") {
+						showStandupExport(a)
+					} else {
+						showMeetingPrepDialog(a, w)
+					}
 				})
 			}
 		}),

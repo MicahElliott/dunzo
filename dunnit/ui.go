@@ -77,6 +77,15 @@ func recordActivity(text, category string) {
 // none exist yet).
 func readLedgerLines() []string {
 	_, fname := getLedger()
+	return readLedgerLinesFrom(fname)
+}
+
+// readLedgerLinesFrom returns all lines from the given ledger file
+// path (empty if it doesn't exist). Factored out of readLedgerLines
+// so callers needing a specific day's file (e.g. FR-17's standup
+// export, which wants the last workday's ledger rather than today's)
+// can reuse the same scan logic.
+func readLedgerLinesFrom(fname string) []string {
 	f, err := os.Open(fname)
 	if err != nil {
 		return nil
@@ -510,6 +519,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			fyne.NewMenuItem("Recurring Meetings...", func() {
 				showMiniCalendarDialog(a, w4)
 			}),
+			fyne.NewMenuItem("Standup Summary...", func() { showStandupExport(a) }),
 		)
 		desk.SetSystemTrayMenu(m)
 	}
