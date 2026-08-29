@@ -89,22 +89,31 @@ func scanAllTags() []string {
 }
 
 // matchingTags returns tags from candidates that contain fragment as
-// a case-insensitive substring, sorted alphabetically. fragment
-// should already have its leading "#" stripped. Returns nil if
-// fragment is empty (no suggestions until the user has typed
-// something after "#").
+// a case-insensitive substring, with prefix matches (fragment matches
+// right after the tag's "#") sorted first, then other substring
+// matches -- each group alphabetical. fragment should already have
+// its leading "#" stripped. Returns nil if fragment is empty (no
+// suggestions until the user has typed something after "#").
 func matchingTags(candidates []string, fragment string) []string {
 	if fragment == "" {
 		return nil
 	}
 	fragment = strings.ToLower(fragment)
-	var out []string
+	var prefixMatches, otherMatches []string
 	for _, tag := range candidates {
-		if strings.Contains(strings.ToLower(tag), fragment) {
-			out = append(out, tag)
+		lower := strings.ToLower(tag)
+		body := strings.TrimPrefix(lower, "#")
+		switch {
+		case strings.HasPrefix(body, fragment):
+			prefixMatches = append(prefixMatches, tag)
+		case strings.Contains(lower, fragment):
+			otherMatches = append(otherMatches, tag)
 		}
 	}
-	return out
+	if len(prefixMatches) == 0 && len(otherMatches) == 0 {
+		return nil
+	}
+	return append(prefixMatches, otherMatches...)
 }
 
 // currentTagFragment inspects text up to cursor (a rune index) and,

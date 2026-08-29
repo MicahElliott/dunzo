@@ -37,6 +37,17 @@ func TestMatchingTags(t *testing.T) {
 	}
 }
 
+func TestMatchingTags_PrefixPriority(t *testing.T) {
+	// "emacs" and "email" both start with "e", "wetware" only
+	// contains "e" mid-word -- prefix matches should come first.
+	candidates := []string{"#wetware", "#emacs", "#email"}
+	got := matchingTags(candidates, "e")
+	want := []string{"#emacs", "#email", "#wetware"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 func TestCurrentTagFragment(t *testing.T) {
 	cases := []struct {
 		text      string
