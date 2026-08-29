@@ -41,6 +41,22 @@ func ledgerFilesFor(period summaryPeriod, now time.Time) []string {
 	}
 
 	var files []string
+	for _, path := range allLedgerFiles() {
+		datePart := ledgerFileDate(path)
+		if datePart == nil {
+			continue
+		}
+		if !datePart.Before(cutoff) && !datePart.After(now) {
+			files = append(files, path)
+		}
+	}
+	return files
+}
+
+// allLedgerFiles returns the paths of every ledger-*.txt file under
+// DunzoDir(), regardless of date, in filesystem walk order.
+func allLedgerFiles() []string {
+	var files []string
 	root := DunzoDir()
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
@@ -50,17 +66,23 @@ func ledgerFilesFor(period summaryPeriod, now time.Time) []string {
 		if !strings.HasPrefix(name, "ledger-") || !strings.HasSuffix(name, ".txt") {
 			return nil
 		}
-		datePart := strings.TrimSuffix(strings.TrimPrefix(name, "ledger-"), ".txt")
-		fileDate, err := time.ParseInLocation("20060102", datePart, now.Location())
-		if err != nil {
-			return nil
-		}
-		if !fileDate.Before(cutoff) && !fileDate.After(now) {
-			files = append(files, path)
-		}
+		files = append(files, path)
 		return nil
 	})
 	return files
+}
+
+// ledgerFileDate parses the YYYYMMDD date out of a ledger file's
+// name (e.g. ".../ledger-20260828.txt"), returning nil if it doesn't
+// match the expected naming pattern.
+func ledgerFileDate(path string) *time.Time {
+	name := filepath.Base(path)
+	datePart := strings.TrimSuffix(strings.TrimPrefix(name, "ledger-"), ".txt")
+	t, err := time.ParseInLocation("20060102", datePart, time.Local)
+	if err != nil {
+		return nil
+	}
+	return &t
 }
 
 // gatherLedgerText concatenates the content of all ledger files for the

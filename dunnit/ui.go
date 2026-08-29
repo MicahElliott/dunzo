@@ -68,6 +68,9 @@ func recordActivity(text, category string) {
 	f.WriteString(outstr)
 	f.Close()
 	lastActivityAt = time.Now()
+	if len(extractTags(text)) > 0 {
+		InvalidateTagCache()
+	}
 }
 
 // readLedgerLines returns all lines from today's ledger file (empty if
@@ -233,6 +236,48 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	input := newCloseShortcutEntry(fyne.KeyW, fyne.KeyModifierShortcutDefault, func() { w4.Hide() })
 	input.SetPlaceHolder("Enter text...")
 	// input.Resize(fyne.NewSize(100.0, 50.0))
+
+	// Tag autocomplete (FR-10): as the user types a "#tag" fragment,
+	// show a popup menu of matching previously-used tags (scanned
+	// from ledger history, cached -- see tags.go). Selecting an entry
+	// replaces the in-progress fragment with the full tag.
+	var tagPopup *widget.PopUpMenu
+	dismissTagPopup := func() {
+		if tagPopup != nil {
+			tagPopup.Hide()
+			tagPopup = nil
+		}
+	}
+	input.OnChanged = func(text string) {
+		dismissTagPopup()
+		start, fragment, ok := currentTagFragment(text, input.CursorColumn)
+		if !ok || len(fragment) < 2 { // need at least "#" + 1 char
+			return
+		}
+		matches := matchingTags(KnownTags(), fragment[1:])
+		if len(matches) == 0 {
+			return
+		}
+		items := make([]*fyne.MenuItem, len(matches))
+		for i, tag := range matches {
+			tag := tag // capture
+			items[i] = fyne.NewMenuItem(tag, func() {
+				runes := []rune(text)
+				newText := string(runes[:start]) + tag + string(runes[input.CursorColumn:])
+				input.SetText(newText)
+				input.CursorColumn = start + len([]rune(tag))
+				input.Refresh()
+				dismissTagPopup()
+			})
+		}
+		canvas := fyne.CurrentApp().Driver().CanvasForObject(input)
+		if canvas == nil {
+			return
+		}
+		tagPopup = widget.NewPopUpMenu(fyne.NewMenu("", items...), canvas)
+		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(input)
+		tagPopup.ShowAtPosition(pos.Add(fyne.NewPos(0, input.Size().Height)))
+	}
 
 	// minsInput is an optional free-text "minutes spent" field (very
 	// informal time tracking). When non-empty and numeric, its value
