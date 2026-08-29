@@ -111,7 +111,10 @@ func lastN(entries []taggedEntry, n int) []taggedEntry {
 // history box is editable for the user's own scratch/annotation use,
 // but editing it never writes back to the original ledger files
 // (append-only design preserved) -- only the note field's Save action
-// writes anything.
+// writes anything. FR-12 folded in here rather than as a separate
+// screen: the MEETING category filter already covers "agenda view by
+// tag", and "Only new since last pull" (backed by lastpulled.go)
+// covers the "last pulled" marker behavior.
 func showMeetingPrepDialog(a fyne.App, parent fyne.Window) {
 	tagEntry := widget.NewEntry()
 	tagEntry.SetPlaceHolder("#tag (e.g. #jeff, #boss)")
@@ -121,6 +124,14 @@ func showMeetingPrepDialog(a fyne.App, parent fyne.Window) {
 
 	catFilterSelect := widget.NewSelect([]string{"MEETING", "Related", "All"}, nil)
 	catFilterSelect.SetSelected("MEETING")
+
+	// onlyNewCheck (FR-12): when checked, entries are additionally
+	// filtered to those newer than the tag's last-pulled marker (see
+	// lastpulled.go), so a repeat pull only shows what's accumulated
+	// since last time. Unchecked (default) shows the full lookback
+	// window regardless of prior pulls -- "all time" within the
+	// window, per FR-12's "unless the user asks for all time".
+	onlyNewCheck := widget.NewCheck("Only new since last pull", nil)
 
 	history := widget.NewMultiLineEntry()
 	history.SetPlaceHolder("Enter a tag above and click Refresh to pull recent entries...")
@@ -137,8 +148,14 @@ func showMeetingPrepDialog(a fyne.App, parent fyne.Window) {
 			weeks = 2
 		}
 		since := time.Now().AddDate(0, 0, -7*weeks)
+		if onlyNewCheck.Checked {
+			if lastPulled, ok := loadLastPulled()[tag]; ok && lastPulled.After(since) {
+				since = lastPulled
+			}
+		}
 		categories := categoryFilterSet(catFilterSelect.Selected)
 		entries := lastN(pullTaggedEntries(tag, since, categories), 8)
+		markPulled(tag)
 		if len(entries) == 0 {
 			history.SetText("(no entries found for " + tag + " in the last " + weeksSelect.Selected + " week(s))")
 			return
@@ -153,6 +170,7 @@ func showMeetingPrepDialog(a fyne.App, parent fyne.Window) {
 	tagEntry.OnSubmitted = func(string) { refreshHistory() }
 	weeksSelect.OnChanged = func(string) { refreshHistory() }
 	catFilterSelect.OnChanged = func(string) { refreshHistory() }
+	onlyNewCheck.OnChanged = func(bool) { refreshHistory() }
 
 	noteEntry := widget.NewMultiLineEntry()
 	noteEntry.SetPlaceHolder("New agenda note for this meeting...")
@@ -161,6 +179,7 @@ func showMeetingPrepDialog(a fyne.App, parent fyne.Window) {
 	content := container.NewVBox(
 		widget.NewLabel("Meeting Prep"),
 		container.NewBorder(nil, nil, nil, container.NewHBox(catFilterSelect, weeksSelect, refreshBtn), tagEntry),
+		onlyNewCheck,
 		widget.NewLabel("Recent entries for this tag (editable scratch view -- does not alter the ledger):"),
 		history,
 		widget.NewLabel("Add a new note:"),
