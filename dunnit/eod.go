@@ -1,6 +1,7 @@
 package dun
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -131,6 +132,21 @@ func showEODWindow(a fyne.App) {
 				carryForwardTodo(item.Text)
 			}
 		}
+		// FR-18: draft (if not already present) today's hand-editable
+		// summary doc, now that the day's SUMMARY/PRODUCTIVITY/
+		// SENTIMENT lines above have just been recorded. Runs in the
+		// background since it shells out to gh copilot; opens in
+		// $EDITOR when ready rather than blocking Finalize Day.
+		go func() {
+			path, _, err := ensureDailySummaryDoc(time.Now())
+			if err != nil {
+				log.Println("Error drafting daily summary doc:", err)
+				return
+			}
+			if path != "" {
+				openInEditor(path)
+			}
+		}()
 		w.Close()
 	}
 

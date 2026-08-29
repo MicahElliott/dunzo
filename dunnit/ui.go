@@ -40,6 +40,14 @@ func getLedger() (string, string) {
 	return fpath, fname
 }
 
+// ledgerDirFor returns the year/week/month directory (same scheme as
+// getLedger) for the given ISO year/week and month abbreviation --
+// factored out so other date-scoped files (e.g. FR-18's daily
+// summary docs) can share the exact same path layout as ledgers.
+func ledgerDirFor(yr, wk int, moname string) string {
+	return filepath.Join(DunzoDir(), strconv.Itoa(yr), "w"+strconv.Itoa(wk)+"-"+moname)
+}
+
 // lastActivityAt tracks the wall-clock time of the most recent
 // recordActivity() call, so the scheduler (sched.go) can suppress a
 // periodic nudge if the user already logged something recently (see
@@ -520,6 +528,18 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 				showMiniCalendarDialog(a, w4)
 			}),
 			fyne.NewMenuItem("Standup Summary...", func() { showStandupExport(a) }),
+			fyne.NewMenuItem("Daily Summary Doc...", func() {
+				go func() {
+					path, _, err := ensureDailySummaryDoc(time.Now())
+					if err != nil {
+						log.Println("Error drafting daily summary doc:", err)
+						return
+					}
+					if path != "" {
+						openInEditor(path)
+					}
+				}()
+			}),
 		)
 		desk.SetSystemTrayMenu(m)
 	}

@@ -90,6 +90,25 @@ func ledgerFileDate(path string) *time.Time {
 // context).
 func gatherLedgerText(period summaryPeriod) string {
 	files := ledgerFilesFor(period, time.Now())
+	return concatLedgerFiles(files)
+}
+
+// gatherLedgerTextForDate is like gatherLedgerText, but scoped to a
+// single specific date's ledger file rather than a rolling period.
+// Used by FR-18's daily summary doc, which always covers exactly one
+// day. Returns "" if that day's ledger doesn't exist / has no
+// content.
+func gatherLedgerTextForDate(date time.Time) string {
+	path := ledgerFileForDate(date)
+	if path == "" {
+		return ""
+	}
+	return concatLedgerFiles([]string{path})
+}
+
+// concatLedgerFiles concatenates the content of the given ledger
+// files into one string (file path headers included, for context).
+func concatLedgerFiles(files []string) string {
 	var sb strings.Builder
 	for _, path := range files {
 		f, err := os.Open(path)
