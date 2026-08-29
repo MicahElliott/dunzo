@@ -540,6 +540,11 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 					}
 				}()
 			}),
+			fyne.NewMenuItem("Trend View...", func() { showTrendView(a) }),
+			fyne.NewMenuItem("Search...", func() {
+				w4.Show()
+				showSearchDialog(a, w4)
+			}),
 		)
 		desk.SetSystemTrayMenu(m)
 	}
