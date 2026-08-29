@@ -15,18 +15,26 @@ import (
 // LLM pass; this is meant to be instant and no-network.
 var standupCategories = map[string]bool{"DONE": true, "WIN": true}
 
-// lastWorkdayLedgerFile returns the ledger file path for the most
-// recent workday before today (skips back over Sat/Sun so a Monday
-// standup still pulls Friday's entries), or "" if none exists.
-func lastWorkdayLedgerFile(now time.Time) string {
-	d := now.AddDate(0, 0, -1)
-	for i := 0; i < 7; i++ { // bounded loop, no infinite spin if something's off
-		if d.Weekday() != time.Saturday && d.Weekday() != time.Sunday {
-			break
-		}
-		d = d.AddDate(0, 0, -1)
+// standupSourceDates returns the dates whose ledgers should feed the
+// standup export, given now. Normally just "yesterday". On Monday,
+// also include Saturday and Sunday (in addition to Friday) in case
+// weekend work was logged, since those days otherwise have no
+// standup of their own to surface them. Returned oldest-first.
+func standupSourceDates(now time.Time) []time.Time {
+	yesterday := now.AddDate(0, 0, -1)
+	if now.Weekday() != time.Monday {
+		return []time.Time{yesterday}
 	}
-	target := "ledger-" + d.Format("20060102") + ".txt"
+	friday := now.AddDate(0, 0, -3)
+	saturday := now.AddDate(0, 0, -2)
+	sunday := yesterday
+	return []time.Time{friday, saturday, sunday}
+}
+
+// ledgerFileForDate returns the ledger file path for date if it
+// exists among allLedgerFiles(), or "" if none.
+func ledgerFileForDate(date time.Time) string {
+	target := "ledger-" + date.Format("20060102") + ".txt"
 	for _, path := range allLedgerFiles() {
 		if strings.HasSuffix(path, target) {
 			return path
@@ -35,21 +43,30 @@ func lastWorkdayLedgerFile(now time.Time) string {
 	return ""
 }
 
-// gatherStandupLines reads the last workday's ledger and returns its
-// DONE/WIN lines' text (category prefix stripped), in original order.
+// gatherStandupLines reads the standup source dates' ledgers (see
+// standupSourceDates -- normally just the last workday, but Fri+Sat+
+// Sun on a Monday) and returns their DONE/WIN lines' text (category
+// prefix stripped), oldest-first, deduplicated (exact-text repeats
+// collapsed to one bullet, first occurrence kept).
 func gatherStandupLines(now time.Time) []string {
-	path := lastWorkdayLedgerFile(now)
-	if path == "" {
-		return nil
-	}
-	lines := readLedgerLinesFrom(path)
+	seen := make(map[string]bool)
 	var out []string
-	for _, line := range lines {
-		cat, text, ok := parseLedgerLine(line)
-		if !ok || !standupCategories[cat] {
+	for _, date := range standupSourceDates(now) {
+		path := ledgerFileForDate(date)
+		if path == "" {
 			continue
 		}
-		out = append(out, text)
+		for _, line := range readLedgerLinesFrom(path) {
+			cat, text, ok := parseLedgerLine(line)
+			if !ok || !standupCategories[cat] {
+				continue
+			}
+			if seen[text] {
+				continue
+			}
+			seen[text] = true
+			out = append(out, text)
+		}
 	}
 	return out
 }
@@ -58,7 +75,7 @@ func gatherStandupLines(now time.Time) []string {
 // placeholder message if there's nothing to report.
 func formatStandup(lines []string) string {
 	if len(lines) == 0 {
-		return "(no DONE/WIN entries found for the last workday)"
+		return "(no DONE/WIN entries found for the covered day(s))"
 	}
 	var sb strings.Builder
 	for _, l := range lines {
