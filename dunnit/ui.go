@@ -9,7 +9,6 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
 
 	"log"
 	"os"
@@ -237,12 +236,15 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 	// minsInput is an optional free-text "minutes spent" field (very
 	// informal time tracking). When non-empty and numeric, its value
-	// is appended to the recorded text as " @Nm" (e.g. "@20m"). Uses
-	// a short placeholder ("m") and a fixed minimum width so it
-	// doesn't get visually squeezed at Dunzo's default window width.
+	// is appended to the recorded text as " @Nm" (e.g. "@20m").
+	// Wrapped in a fixed-size container (minsWrapper) so it renders
+	// at a comfortable width regardless of its own placeholder-driven
+	// MinSize -- stretchRowLayout below treats it as a fixed-width
+	// object (like groupFilter/category), giving all remaining space
+	// to `input` instead.
 	minsInput := widget.NewEntry()
-	minsInput.SetPlaceHolder("m")
-	minsWrapper := container.New(layout.NewGridWrapLayout(fyne.NewSize(48, minsInput.MinSize().Height)), minsInput)
+	minsInput.SetPlaceHolder("mins")
+	minsWrapper := container.NewGridWrap(fyne.NewSize(64, minsInput.MinSize().Height), minsInput)
 
 	// withMins appends " @Nm" to text if minsInput has a valid
 	// positive integer in it; otherwise returns text unchanged.
@@ -297,10 +299,12 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// first, then top, bottom, left, right) regardless of which
 	// visual position they occupy -- so a NewBorder-based row can
 	// easily end up with Tab order that doesn't match what's on
-	// screen. Prefer container.NewHBox/NewVBox (whose Objects order
-	// always matches argument/visual order) for any row where tab
-	// order matters, as done below.
-	doneWrapper := container.NewHBox(groupFilter, category, input, minsWrapper)
+	// screen. stretchRowLayout (stretchrow.go) is used instead: it
+	// preserves the exact slice order passed to container.New (so Tab
+	// order matches visual left-to-right order) while still letting
+	// `input` stretch to fill available width like NewBorder's center
+	// content would have.
+	doneWrapper := container.New(newStretchRowLayout(input), groupFilter, category, input, minsWrapper)
 
 	fmt.Println(input.MinSize())
 
