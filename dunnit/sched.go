@@ -98,13 +98,24 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 
 	// FR-13: Start-of-Day nudge, fires once per workday near
 	// cfg.DayStart, showing today's open TODOs/GOALs (readback) and a
-	// chance to add more before the day gets going.
+	// chance to add more before the day gets going. FR-14: if today
+	// is also the 1st of the month, show the SOM wizard instead (its
+	// step 4 already covers the same "current GOALs" readback SOD
+	// would show, so no need for both).
 	if sh, sm := parseHM(cfg.DayStart); sh != 0 || sm != 0 {
 		_, err = s.NewJob(
 			gocron.DailyJob(1, gocron.NewAtTimes(gocron.NewAtTime(uint(sh), uint(sm), 0))),
 			gocron.NewTask(func() {
 				now := time.Now()
 				if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
+					return
+				}
+				if now.Day() == 1 {
+					a.SendNotification(fyne.NewNotification(
+						"Dunzo", "Start of a new month!"))
+					fyne.Do(func() {
+						showSOMWindow(a)
+					})
 					return
 				}
 				a.SendNotification(fyne.NewNotification(
