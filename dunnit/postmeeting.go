@@ -5,7 +5,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -22,7 +21,13 @@ var postMeetingCategories = []string{"TIL", "TODO", "GOAL", "RISK"}
 // fields write nothing. tag may be "" (e.g. invoked from the tray
 // rather than a specific recurring meeting) -- the user can still
 // type one in.
-func showPostMeetingCapture(a fyne.App, parent fyne.Window, tag string) {
+//
+// Own standalone window (not a dialog parented on Daybook) -- Daybook
+// is normally hidden, and this is a tray-invoked, occasional workflow
+// with no dependency on Daybook being open.
+func showPostMeetingCapture(a fyne.App, tag string) {
+	w := a.NewWindow("Dunzo: Post-Meeting Capture")
+
 	tagEntry := widget.NewEntry()
 	tagEntry.SetPlaceHolder("#tag (e.g. #boss) -- entries are grouped under this tag")
 	tagEntry.SetText(tag)
@@ -37,28 +42,31 @@ func showPostMeetingCapture(a fyne.App, parent fyne.Window, tag string) {
 		formItems = append(formItems, widget.NewFormItem(cat, e))
 	}
 
+	save := func() {
+		meetingTag := normalizeTag(tagEntry.Text)
+		for _, cat := range postMeetingCategories {
+			text := strings.TrimSpace(fields[cat].Text)
+			if text == "" {
+				continue
+			}
+			if meetingTag != "" {
+				text = meetingTag + " " + text
+			}
+			recordActivity(text, cat)
+		}
+		w.Close()
+	}
+
 	content := container.NewVBox(
 		widget.NewLabel("Post-Meeting Capture -- quick multi-category dump, skip any field:"),
 		widget.NewForm(formItems...),
+		container.NewHBox(
+			widget.NewButton("Save", save),
+			widget.NewButton("Cancel", func() { w.Close() }),
+		),
 	)
 
-	d := dialog.NewCustomConfirm("Post-Meeting Capture", "Save", "Cancel", content,
-		func(ok bool) {
-			if !ok {
-				return
-			}
-			meetingTag := normalizeTag(tagEntry.Text)
-			for _, cat := range postMeetingCategories {
-				text := strings.TrimSpace(fields[cat].Text)
-				if text == "" {
-					continue
-				}
-				if meetingTag != "" {
-					text = meetingTag + " " + text
-				}
-				recordActivity(text, cat)
-			}
-		}, parent)
-	d.Resize(fyne.NewSize(480, 360))
-	d.Show()
+	w.SetContent(content)
+	w.Resize(fyne.NewSize(480, 400))
+	w.Show()
 }

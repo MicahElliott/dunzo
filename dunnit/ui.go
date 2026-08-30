@@ -530,14 +530,8 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// Menu
 	if desk, ok := a.(desktop.App); ok {
 		meetingsMenu := fyne.NewMenu("Meetings",
-			fyne.NewMenuItem("Meeting Prep...", func() {
-				w4.Show()
-				showMeetingPrepDialog(a, w4)
-			}),
-			fyne.NewMenuItem("Post-Meeting Capture...", func() {
-				w4.Show()
-				showPostMeetingCapture(a, w4, "")
-			}),
+			fyne.NewMenuItem("Meeting Prep...", func() { showMeetingPrepDialog(a) }),
+			fyne.NewMenuItem("Post-Meeting Capture...", func() { showPostMeetingCapture(a, "") }),
 			fyne.NewMenuItem("Recurring Meetings...", func() {
 				showMiniCalendarDialog(a, w4)
 			}),
@@ -546,19 +540,10 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		meetingsItem.ChildMenu = meetingsMenu
 
 		reportsMenu := fyne.NewMenu("Reports",
-			fyne.NewMenuItem("Summarize...", func() {
-				w4.Show()
-				showSummarizeDialog(a, w4)
-			}),
+			fyne.NewMenuItem("Summarize...", func() { showSummarizeDialog(a) }),
 			fyne.NewMenuItem("Standup Summary...", func() { showStandupExport(a) }),
-			fyne.NewMenuItem("Status Report...", func() {
-				w4.Show()
-				showStatusReportDialog(a, w4)
-			}),
-			fyne.NewMenuItem("Annual Review...", func() {
-				w4.Show()
-				showAnnualReviewDialog(a, w4)
-			}),
+			fyne.NewMenuItem("Status Report...", func() { showStatusReportDialog(a) }),
+			fyne.NewMenuItem("Annual Review...", func() { showAnnualReviewDialog(a) }),
 			fyne.NewMenuItem("Trend View...", func() { showTrendView(a) }),
 		)
 		reportsItem := fyne.NewMenuItem("Reports", nil)
@@ -581,10 +566,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 					refreshOpenItems()
 				})
 			}),
-			fyne.NewMenuItem("Search...", func() {
-				w4.Show()
-				showSearchDialog(a, w4)
-			}),
+			fyne.NewMenuItem("Search...", func() { showSearchDialog(a) }),
 			fyne.NewMenuItem("Daily Summary Doc...", func() {
 				go func() {
 					path, _, err := ensureDailySummaryDoc(time.Now())

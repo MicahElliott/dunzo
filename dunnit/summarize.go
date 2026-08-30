@@ -11,7 +11,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -205,24 +204,35 @@ func summarizeWithCopilot(ledgerText string) (string, error) {
 
 // showSummarizeDialog lets the user pick a period, then runs the
 // summary and displays the result in a new window.
-func showSummarizeDialog(a fyne.App, parent fyne.Window) {
+//
+// Own standalone window (not a dialog parented on Daybook) -- Daybook
+// is normally hidden, and this is a tray-invoked, occasional workflow
+// with no dependency on Daybook being open.
+func showSummarizeDialog(a fyne.App) {
+	w := a.NewWindow("Dunzo: Summarize")
+
 	options := []string{string(periodDay), string(periodWeek), string(periodMonth), string(periodQuarter)}
 	periodSelect := widget.NewSelect(options, nil)
 	periodSelect.SetSelected(string(periodDay))
 
-	d := dialog.NewCustomConfirm("Summarize", "Generate", "Cancel",
-		container.NewVBox(
-			widget.NewLabel("Summarize accomplishments for:"),
-			periodSelect,
+	generate := func() {
+		period := summaryPeriod(periodSelect.Selected)
+		w.Close()
+		runSummarize(a, period)
+	}
+
+	content := container.NewVBox(
+		widget.NewLabel("Summarize accomplishments for:"),
+		periodSelect,
+		container.NewHBox(
+			widget.NewButton("Generate", generate),
+			widget.NewButton("Cancel", func() { w.Close() }),
 		),
-		func(ok bool) {
-			if !ok {
-				return
-			}
-			period := summaryPeriod(periodSelect.Selected)
-			runSummarize(a, period)
-		}, parent)
-	d.Show()
+	)
+
+	w.SetContent(content)
+	w.Resize(fyne.NewSize(300, 140))
+	w.Show()
 }
 
 func runSummarize(a fyne.App, period summaryPeriod) {

@@ -10,7 +10,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -115,7 +114,13 @@ func lastN(entries []taggedEntry, n int) []taggedEntry {
 // screen: the MEETING category filter already covers "agenda view by
 // tag", and "Only new since last pull" (backed by lastpulled.go)
 // covers the "last pulled" marker behavior.
-func showMeetingPrepDialog(a fyne.App, parent fyne.Window) {
+//
+// Own standalone window (not a dialog parented on Daybook) -- Daybook
+// is normally hidden, and this is a tray-invoked, occasional workflow
+// with no dependency on Daybook being open.
+func showMeetingPrepDialog(a fyne.App) {
+	w := a.NewWindow("Dunzo: Meeting Prep")
+
 	tagEntry := widget.NewEntry()
 	tagEntry.SetPlaceHolder("#tag (e.g. #jeff, #boss)")
 
@@ -176,6 +181,16 @@ func showMeetingPrepDialog(a fyne.App, parent fyne.Window) {
 	noteEntry.SetPlaceHolder("New agenda note for this meeting...")
 	noteEntry.SetMinRowsVisible(3)
 
+	saveNote := func() {
+		tag := normalizeTag(tagEntry.Text)
+		note := strings.TrimSpace(noteEntry.Text)
+		if tag == "" || note == "" {
+			return
+		}
+		recordActivity(tag+" "+note, "MEETING")
+		noteEntry.SetText("")
+	}
+
 	content := container.NewVBox(
 		widget.NewLabel("Meeting Prep"),
 		container.NewBorder(nil, nil, nil, container.NewHBox(catFilterSelect, weeksSelect, refreshBtn), tagEntry),
@@ -184,20 +199,13 @@ func showMeetingPrepDialog(a fyne.App, parent fyne.Window) {
 		history,
 		widget.NewLabel("Add a new note:"),
 		noteEntry,
+		container.NewHBox(
+			widget.NewButton("Save Note", saveNote),
+			widget.NewButton("Close", func() { w.Close() }),
+		),
 	)
 
-	d := dialog.NewCustomConfirm("Meeting Prep", "Save Note", "Close", content,
-		func(ok bool) {
-			if !ok {
-				return
-			}
-			tag := normalizeTag(tagEntry.Text)
-			note := strings.TrimSpace(noteEntry.Text)
-			if tag == "" || note == "" {
-				return
-			}
-			recordActivity(tag+" "+note, "MEETING")
-		}, parent)
-	d.Resize(fyne.NewSize(480, 480))
-	d.Show()
+	w.SetContent(content)
+	w.Resize(fyne.NewSize(480, 520))
+	w.Show()
 }

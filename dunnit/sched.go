@@ -181,11 +181,10 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 							"Dunzo", "Upcoming meeting "+m.Tag+" at "+m.Time))
 						m := m // capture for closure
 						fyne.Do(func() {
-							w.Show()
 							if strings.EqualFold(m.Tag, "#dsu") {
 								showStandupExport(a)
 							} else {
-								showMeetingPrepDialog(a, w)
+								showMeetingPrepDialog(a)
 							}
 						})
 					}
@@ -198,8 +197,7 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 							"Dunzo", "Post-meeting capture for "+m.Tag+"?"))
 						m := m // capture for closure
 						fyne.Do(func() {
-							w.Show()
-							showPostMeetingCapture(a, w, m.Tag)
+							showPostMeetingCapture(a, m.Tag)
 						})
 					}
 				}

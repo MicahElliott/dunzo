@@ -31,7 +31,13 @@ const shareableStatusPrompt = "Summarize the following ledger entries into a " +
 // showStatusReportDialog lets the user pick a date range and an
 // audience (Private/Shareable), then generates the report via the
 // shared Summarize/gh copilot plumbing (FR-23).
-func showStatusReportDialog(a fyne.App, parent fyne.Window) {
+//
+// Own standalone window (not a dialog parented on Daybook) -- Daybook
+// is normally hidden, and this is a tray-invoked, occasional workflow
+// with no dependency on Daybook being open.
+func showStatusReportDialog(a fyne.App) {
+	w := a.NewWindow("Dunzo: Status Report")
+
 	today := time.Now()
 	fromEntry := widget.NewEntry()
 	fromEntry.SetText(today.AddDate(0, 0, -7).Format("2006-01-02"))
@@ -44,28 +50,33 @@ func showStatusReportDialog(a fyne.App, parent fyne.Window) {
 	audienceSelect := widget.NewSelect([]string{"Private", "Shareable"}, nil)
 	audienceSelect.SetSelected("Private")
 
-	d := dialog.NewCustomConfirm("Status Report", "Generate", "Cancel",
-		container.NewVBox(
-			widget.NewLabel("From (YYYY-MM-DD):"),
-			fromEntry,
-			widget.NewLabel("To (YYYY-MM-DD):"),
-			toEntry,
-			widget.NewLabel("Audience:"),
-			audienceSelect,
+	generate := func() {
+		from, err1 := time.ParseInLocation("2006-01-02", strings.TrimSpace(fromEntry.Text), time.Local)
+		to, err2 := time.ParseInLocation("2006-01-02", strings.TrimSpace(toEntry.Text), time.Local)
+		if err1 != nil || err2 != nil {
+			dialog.ShowError(errors.New("From/To must be valid YYYY-MM-DD dates"), w)
+			return
+		}
+		w.Close()
+		runStatusReport(a, from, to, audienceSelect.Selected)
+	}
+
+	content := container.NewVBox(
+		widget.NewLabel("From (YYYY-MM-DD):"),
+		fromEntry,
+		widget.NewLabel("To (YYYY-MM-DD):"),
+		toEntry,
+		widget.NewLabel("Audience:"),
+		audienceSelect,
+		container.NewHBox(
+			widget.NewButton("Generate", generate),
+			widget.NewButton("Cancel", func() { w.Close() }),
 		),
-		func(ok bool) {
-			if !ok {
-				return
-			}
-			from, err1 := time.ParseInLocation("2006-01-02", strings.TrimSpace(fromEntry.Text), time.Local)
-			to, err2 := time.ParseInLocation("2006-01-02", strings.TrimSpace(toEntry.Text), time.Local)
-			if err1 != nil || err2 != nil {
-				dialog.ShowError(errors.New("From/To must be valid YYYY-MM-DD dates"), parent)
-				return
-			}
-			runStatusReport(a, from, to, audienceSelect.Selected)
-		}, parent)
-	d.Show()
+	)
+
+	w.SetContent(content)
+	w.Resize(fyne.NewSize(360, 320))
+	w.Show()
 }
 
 func runStatusReport(a fyne.App, from, to time.Time, audience string) {

@@ -6,7 +6,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -41,7 +40,13 @@ func searchLedgers(query string) []searchResult {
 
 // showSearchDialog lets the user search across all ledger history by
 // keyword/tag/category (FR-21), showing matches with file context.
-func showSearchDialog(a fyne.App, parent fyne.Window) {
+//
+// Own standalone window (not a dialog parented on Daybook) -- Daybook
+// is normally hidden, and this is a tray-invoked, occasional workflow
+// with no dependency on Daybook being open.
+func showSearchDialog(a fyne.App) {
+	w := a.NewWindow("Dunzo: Search Ledger History")
+
 	queryEntry := widget.NewEntry()
 	queryEntry.SetPlaceHolder("Search term (tag, category, or keyword)...")
 
@@ -69,7 +74,7 @@ func showSearchDialog(a fyne.App, parent fyne.Window) {
 		results,
 	)
 
-	d := dialog.NewCustom("Search Ledger History", "Close", content, parent)
-	d.Resize(fyne.NewSize(560, 480))
-	d.Show()
+	w.SetContent(content)
+	w.Resize(fyne.NewSize(560, 480))
+	w.Show()
 }
