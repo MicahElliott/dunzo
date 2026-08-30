@@ -80,6 +80,17 @@ func SnoozedUntil() time.Time {
 	return snoozedUntil
 }
 
+// defaultSnoozeDuration returns the configured default snooze
+// duration (cfg.SnoozeMinutes), falling back to 15 minutes if unset/
+// invalid.
+func defaultSnoozeDuration() time.Duration {
+	minutes := LoadConfig().SnoozeMinutes
+	if minutes <= 0 {
+		minutes = 15
+	}
+	return time.Duration(minutes) * time.Minute
+}
+
 func recordActivity(text, category string) {
 	log.Println("Content was:", text)
 	fpath, fname := getLedger()
@@ -166,21 +177,23 @@ func openInEditor(path string) {
 	}
 }
 
-// showCategoryLegend opens a static window listing every category's
-// emoji/code and one-line intended-use description (FR-06), grouped
-// by Now/Plan/Reflect with section headers. Text comes directly from
-// Categories (categories.go), so it can't drift out of sync with the
-// actual picker options. Positive-sentiment categories render bold
-// dark green; negative-sentiment ones render dark red.
+// showHelp opens a static window listing every category's emoji/code
+// and one-line intended-use description (FR-06), grouped by Now/Plan/
+// Reflect with section headers. Text comes directly from Categories
+// (categories.go), so it can't drift out of sync with the actual
+// picker options. Positive-sentiment categories render bold dark
+// green; negative-sentiment ones render dark red. Named "Help" (not
+// "Category Legend") in the UI -- broader framing for a window that
+// may grow beyond just categories later.
 //
-// Note: this coloring only applies to the static Legend window --
-// Fyne's widget.Select doesn't support per-option rich text/color in
-// its dropdown, so the live category picker itself stays plain text.
-func showCategoryLegend(a fyne.App) {
+// Note: this coloring only applies to the static Help window -- Fyne's
+// widget.Select doesn't support per-option rich text/color in its
+// dropdown, so the live category picker itself stays plain text.
+func showHelp(a fyne.App) {
 	darkGreen := color.NRGBA{R: 0, G: 100, B: 0, A: 255}
 	darkRed := color.NRGBA{R: 139, G: 0, B: 0, A: 255}
 
-	w := a.NewWindow("Dunzo: Category Legend")
+	w := a.NewWindow("Dunzo: Help")
 	rows := container.NewVBox()
 	lastGroup := ""
 	for _, c := range Categories {
@@ -488,10 +501,11 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 				refreshOpenItems()
 			}
 		}),
-		widget.NewButton("Snooze 15m", func() {
-			Snooze(15 * time.Minute)
+		widget.NewButton("Snooze", func() {
+			Snooze(defaultSnoozeDuration())
 			w4.Hide()
 		}),
+		widget.NewButton("Help...", func() { showHelp(a) }),
 	)
 
 	content := container.NewVBox(
@@ -592,6 +606,14 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		ledgerItem := fyne.NewMenuItem("Ledger", nil)
 		ledgerItem.ChildMenu = ledgerMenu
 
+		snoozeMenu := fyne.NewMenu("Snooze",
+			fyne.NewMenuItem("15 min", func() { Snooze(15 * time.Minute) }),
+			fyne.NewMenuItem("30 min", func() { Snooze(30 * time.Minute) }),
+			fyne.NewMenuItem("1 hour", func() { Snooze(60 * time.Minute) }),
+		)
+		snoozeItem := fyne.NewMenuItem("Snooze", func() { Snooze(defaultSnoozeDuration()) })
+		snoozeItem.ChildMenu = snoozeMenu
+
 		// Since Daybook is normally hidden and only pops up briefly
 		// (per Micah), the tray menu -- not Daybook -- is the primary
 		// surface for anything that isn't a direct reaction to
@@ -601,18 +623,22 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		// (Meetings/Reports/Ledger) rather than by FR number or
 		// chronology.
 		m := fyne.NewMenu("Dunzo",
-			fyne.NewMenuItem("Show", func() { refreshOpenItems(); w4.Show() }),
+			fyne.NewMenuItem("Show", func() {
+				refreshOpenItems()
+				w4.Show()
+				w4.RequestFocus()
+			}),
 			fyne.NewMenuItemSeparator(),
 			fyne.NewMenuItem("Start of Day...", func() { showSODWindow(a) }),
 			fyne.NewMenuItem("End of Day...", func() { showEODWindow(a) }),
 			fyne.NewMenuItem("Start of Month...", func() { showSOMWindow(a) }),
-			fyne.NewMenuItem("Snooze 15m", func() { Snooze(15 * time.Minute) }),
+			snoozeItem,
 			fyne.NewMenuItemSeparator(),
 			meetingsItem,
 			reportsItem,
 			ledgerItem,
 			fyne.NewMenuItemSeparator(),
-			fyne.NewMenuItem("Category Legend...", func() { showCategoryLegend(a) }),
+			fyne.NewMenuItem("Help...", func() { showHelp(a) }),
 			fyne.NewMenuItem("Settings...", func() { showSettings(a) }),
 		)
 		desk.SetSystemTrayMenu(m)

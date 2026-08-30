@@ -41,6 +41,9 @@ func showSettings(a fyne.App) {
 	autoDraft := widget.NewCheck("", nil)
 	autoDraft.SetChecked(cfg.AutoDraftDailySummary)
 
+	snoozeMinutes := widget.NewEntry()
+	snoozeMinutes.SetText(strconv.Itoa(cfg.SnoozeMinutes))
+
 	form := widget.NewForm(
 		widget.NewFormItem("Day Start (HH:MM)", dayStart),
 		widget.NewFormItem("Day End (HH:MM)", dayEnd),
@@ -49,11 +52,17 @@ func showSettings(a fyne.App) {
 		widget.NewFormItem("Weekly Digest Day", digestDay),
 		widget.NewFormItem("Weekly Digest Time (HH:MM)", digestTime),
 		widget.NewFormItem("Auto-draft Daily Summary at EOD", autoDraft),
+		widget.NewFormItem("Default Snooze (minutes)", snoozeMinutes),
 	)
 	form.OnSubmit = func() {
 		minutes, err := strconv.Atoi(nudgeInterval.Text)
 		if err != nil {
 			dialog.ShowError(fmt.Errorf("Nudge Interval must be a number: %w", err), w)
+			return
+		}
+		snooze, err := strconv.Atoi(snoozeMinutes.Text)
+		if err != nil || snooze <= 0 {
+			dialog.ShowError(fmt.Errorf("Default Snooze must be a positive number"), w)
 			return
 		}
 		// Start from the loaded config rather than a blank Config{}
@@ -67,6 +76,7 @@ func showSettings(a fyne.App) {
 		newCfg.WeeklyDigestDay = digestDay.Selected
 		newCfg.WeeklyDigestTime = digestTime.Text
 		newCfg.AutoDraftDailySummary = autoDraft.Checked
+		newCfg.SnoozeMinutes = snooze
 		if err := writeConfig(newCfg); err != nil {
 			dialog.ShowError(err, w)
 			return
@@ -76,6 +86,6 @@ func showSettings(a fyne.App) {
 	form.SubmitText = "Save"
 
 	w.SetContent(form)
-	w.Resize(fyne.NewSize(320, 280))
+	w.Resize(fyne.NewSize(320, 320))
 	w.Show()
 }

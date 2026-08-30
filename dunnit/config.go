@@ -56,6 +56,13 @@ type Config struct {
 	// docs/open-design-questions.md). Manual drafting via the "Daily
 	// Summary Doc..." tray item is unaffected by this flag.
 	AutoDraftDailySummary bool `toml:"auto_draft_daily_summary"`
+
+	// SnoozeMinutes (FR-26) is the default duration used by the
+	// "Snooze" action (both Daybook's button and the tray menu's
+	// default top-level item). Defaults to 15 if unset/invalid. The
+	// tray menu also offers a few fixed alternatives (15/30/60) via a
+	// submenu regardless of this setting.
+	SnoozeMinutes int `toml:"snooze_minutes"`
 }
 
 // defaultConfig mirrors the values from dunnit's config-example.zsh.
@@ -65,6 +72,7 @@ func defaultConfig() Config {
 		DayEnd:               "17:30",
 		NudgeIntervalMinutes: 60,
 		LunchTime:            "11:30",
+		SnoozeMinutes:        15,
 	}
 }
 
