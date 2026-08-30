@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 )
@@ -85,7 +86,14 @@ func showSettings(a fyne.App) {
 	}
 	form.SubmitText = "Save"
 
-	w.SetContent(form)
-	w.Resize(fyne.NewSize(320, 320))
+	// Recurring Meetings (FR-15) is its own dialog/config section, but
+	// Settings is a natural place to also reach it from -- both are
+	// "configure how Dunzo behaves" surfaces.
+	recurringMeetingsBtn := widget.NewButton("Recurring Meetings...", func() {
+		showMiniCalendarDialog(a, w)
+	})
+
+	w.SetContent(container.NewVBox(form, recurringMeetingsBtn))
+	w.Resize(fyne.NewSize(320, 340))
 	w.Show()
 }

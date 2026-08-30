@@ -264,14 +264,12 @@ func (e *closeShortcutEntry) TypedShortcut(shortcut fyne.Shortcut) {
 func BuildMainWindow(a fyne.App) fyne.Window {
 	a.Settings().SetTheme(theme.LightTheme())
 
-	w4 := a.NewWindow("Dunzo")
+	w4 := a.NewWindow("Dunzo: Daybook")
 	// label1 := widget.NewLabel("Label 1")
 	// value1 := widget.NewLabel("Value")
 	// label2 := widget.NewLabel("Label 2")
 	// value2 := widget.NewLabel("Something")
 
-	green := color.NRGBA{R: 0, G: 180, B: 0, A: 255}
-	colorText := canvas.NewText("I colored this", green)
 	// lastDunnitLabel uses markdown bold on the "Last Dunnit:" prefix
 	// to visually separate it from the actual recorded text.
 	// refreshLastDunnit keeps all call sites in sync with that format.
@@ -279,7 +277,6 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	refreshLastDunnit := func() {
 		lastDunnitLabel.ParseMarkdown("**Last Dunnit:** " + getLastDunnit())
 	}
-	commonTopics := getCommonTopics()
 
 	// TODO show day's GOALs
 
@@ -509,13 +506,11 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	)
 
 	content := container.NewVBox(
-		// widget.NewLabel(colorText),
-		widget.NewLabel("Common topics you use:" + commonTopics),
-		colorText,
-		lastDunnitLabel,
 		widget.NewLabel("What would you like to record?"),
+		lastDunnitLabel,
 		doneWrapper,
 		// category, input,
+		widget.NewLabel("Common tags: "+strings.Join(commonAndRecentTags(8), " ")),
 		buttons,
 		widget.NewSeparator(),
 		openItemsBox,
@@ -647,11 +642,6 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	w4.Show()
 
 	return w4
-}
-
-// TODO Look over last month's most-used tags. May need to support a list of non-work topics
-func getCommonTopics() string {
-	return "#personal #ticketno #dunnit #interview #lob #emacs #pts:3"
 }
 
 func getLastDunnit() string {
