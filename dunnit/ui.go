@@ -18,7 +18,6 @@ import (
 	"strconv"
 
 	"fyne.io/fyne/v2/driver/desktop"
-	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"strings"
@@ -401,11 +400,13 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	fmt.Println(input.MinSize())
 
 	// openItemsBox displays currently-open TODO/GOAL lines together
-	// under one "Upcoming" heading (FR-07), each with "Done" (convert
-	// to DONE) and "Postpone" (defer to SOMEDAY, keeping the list from
-	// growing unbounded) actions. refreshOpenItems rebuilds it from
-	// the current ledger contents; called after any save/convert/
-	// postpone action so the list stays in sync.
+	// under one "Upcoming" heading (FR-07), split into TODO/GOAL
+	// sub-sections (mirroring showSODWindow's layout, for
+	// consistency) each with "Done" (convert to DONE) and "Postpone"
+	// (defer to SOMEDAY, keeping the list from growing unbounded)
+	// actions. refreshOpenItems rebuilds it from the current ledger
+	// contents; called after any save/convert/postpone action so the
+	// list stays in sync.
 	openItemsBox := container.NewVBox()
 	var refreshOpenItems func()
 	refreshOpenItems = func() {
@@ -416,8 +417,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			return
 		}
 		openItemsBox.Add(widget.NewLabelWithStyle("Upcoming", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
-		for _, item := range items {
-			item := item // capture for closures below
+		addRow := func(item OpenItem) {
 			catLabel := canvas.NewText(item.Category, theme.Color(theme.ColorNameForeground))
 			catLabel.TextStyle = fyne.TextStyle{Monospace: true}
 			row := container.NewBorder(nil, nil, catLabel,
@@ -435,6 +435,26 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 				),
 				widget.NewLabel(item.Text))
 			openItemsBox.Add(row)
+		}
+		var todos, goals []OpenItem
+		for _, item := range items {
+			if item.Category == "GOAL" {
+				goals = append(goals, item)
+			} else {
+				todos = append(todos, item)
+			}
+		}
+		if len(todos) > 0 {
+			openItemsBox.Add(widget.NewLabelWithStyle("TODOs", fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
+			for _, item := range todos {
+				addRow(item)
+			}
+		}
+		if len(goals) > 0 {
+			openItemsBox.Add(widget.NewLabelWithStyle("GOALs", fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
+			for _, item := range goals {
+				addRow(item)
+			}
 		}
 		openItemsBox.Refresh()
 	}
@@ -468,30 +488,6 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 				refreshOpenItems()
 			}
 		}),
-		widget.NewButton("Show Dunnits", func() {
-			w3 := a.NewWindow("Dunzo: Today")
-			w3.SetContent(widget.NewLabel(strings.Join(readLedgerLines(), "\n")))
-			w3.Resize(fyne.NewSize(500, 400))
-			w3.Show()
-		}),
-		widget.NewButton("Edit Dunnits", func() {
-			_, fname := getLedger()
-			openInEditor(fname)
-		}),
-		widget.NewButton("Show Goals", func() {
-			goals := getGoals()
-			if len(goals) == 0 {
-				dialog.ShowInformation("No Goals Yet",
-					"You haven't set any goals today.\nRecord one with the GOAL category to get started!",
-					w4)
-				return
-			}
-			w3 := a.NewWindow("Dunzo: Goals")
-			w3.SetContent(widget.NewLabel(strings.Join(goals, "\n")))
-			w3.Show()
-
-		} ),
-		widget.NewButton("Meeting Prep...", func() { showMeetingPrepDialog(a, w4) }),
 		widget.NewButton("Snooze 15m", func() {
 			Snooze(15 * time.Minute)
 			w4.Hide()
@@ -502,12 +498,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		// widget.NewLabel(colorText),
 		widget.NewLabel("Common topics you use:" + commonTopics),
 		colorText,
-		container.NewHBox(lastDunnitLabel, widget.NewButton("Edit", func() {
-			showUndoEditLastEntry(a, func() {
-				refreshLastDunnit()
-				refreshOpenItems()
-			})
-		})),
+		lastDunnitLabel,
 		widget.NewLabel("What would you like to record?"),
 		doneWrapper,
 		// category, input,
@@ -529,17 +520,51 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 	// Menu
 	if desk, ok := a.(desktop.App); ok {
-		m := fyne.NewMenu("Dunzo",
-			fyne.NewMenuItem("Show", func() { refreshOpenItems(); w4.Show() }),
+		meetingsMenu := fyne.NewMenu("Meetings",
+			fyne.NewMenuItem("Meeting Prep...", func() {
+				w4.Show()
+				showMeetingPrepDialog(a, w4)
+			}),
+			fyne.NewMenuItem("Post-Meeting Capture...", func() {
+				w4.Show()
+				showPostMeetingCapture(a, w4, "")
+			}),
+			fyne.NewMenuItem("Recurring Meetings...", func() {
+				showMiniCalendarDialog(a, w4)
+			}),
+		)
+		meetingsItem := fyne.NewMenuItem("Meetings", nil)
+		meetingsItem.ChildMenu = meetingsMenu
+
+		reportsMenu := fyne.NewMenu("Reports",
 			fyne.NewMenuItem("Summarize...", func() {
 				w4.Show()
 				showSummarizeDialog(a, w4)
 			}),
-			fyne.NewMenuItem("Settings...", func() { showSettings(a) }),
-			fyne.NewMenuItem("Category Legend...", func() { showCategoryLegend(a) }),
-			fyne.NewMenuItem("Meeting Prep...", func() {
+			fyne.NewMenuItem("Standup Summary...", func() { showStandupExport(a) }),
+			fyne.NewMenuItem("Status Report...", func() {
 				w4.Show()
-				showMeetingPrepDialog(a, w4)
+				showStatusReportDialog(a, w4)
+			}),
+			fyne.NewMenuItem("Annual Review...", func() {
+				w4.Show()
+				showAnnualReviewDialog(a, w4)
+			}),
+			fyne.NewMenuItem("Trend View...", func() { showTrendView(a) }),
+		)
+		reportsItem := fyne.NewMenuItem("Reports", nil)
+		reportsItem.ChildMenu = reportsMenu
+
+		ledgerMenu := fyne.NewMenu("Ledger",
+			fyne.NewMenuItem("Show Today's Ledger...", func() {
+				w3 := a.NewWindow("Dunzo: Today")
+				w3.SetContent(widget.NewLabel(strings.Join(readLedgerLines(), "\n")))
+				w3.Resize(fyne.NewSize(500, 400))
+				w3.Show()
+			}),
+			fyne.NewMenuItem("Edit Today's Ledger...", func() {
+				_, fname := getLedger()
+				openInEditor(fname)
 			}),
 			fyne.NewMenuItem("Undo/Edit Last Entry...", func() {
 				showUndoEditLastEntry(a, func() {
@@ -547,17 +572,10 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 					refreshOpenItems()
 				})
 			}),
-			fyne.NewMenuItem("Start of Day...", func() { showSODWindow(a) }),
-			fyne.NewMenuItem("End of Day...", func() { showEODWindow(a) }),
-			fyne.NewMenuItem("Start of Month...", func() { showSOMWindow(a) }),
-			fyne.NewMenuItem("Recurring Meetings...", func() {
-				showMiniCalendarDialog(a, w4)
-			}),
-			fyne.NewMenuItem("Post-Meeting Capture...", func() {
+			fyne.NewMenuItem("Search...", func() {
 				w4.Show()
-				showPostMeetingCapture(a, w4, "")
+				showSearchDialog(a, w4)
 			}),
-			fyne.NewMenuItem("Standup Summary...", func() { showStandupExport(a) }),
 			fyne.NewMenuItem("Daily Summary Doc...", func() {
 				go func() {
 					path, _, err := ensureDailySummaryDoc(time.Now())
@@ -570,19 +588,32 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 					}
 				}()
 			}),
-			fyne.NewMenuItem("Trend View...", func() { showTrendView(a) }),
-			fyne.NewMenuItem("Search...", func() {
-				w4.Show()
-				showSearchDialog(a, w4)
-			}),
-			fyne.NewMenuItem("Annual Review...", func() {
-				w4.Show()
-				showAnnualReviewDialog(a, w4)
-			}),
-			fyne.NewMenuItem("Status Report...", func() {
-				w4.Show()
-				showStatusReportDialog(a, w4)
-			}),
+		)
+		ledgerItem := fyne.NewMenuItem("Ledger", nil)
+		ledgerItem.ChildMenu = ledgerMenu
+
+		// Since Daybook is normally hidden and only pops up briefly
+		// (per Micah), the tray menu -- not Daybook -- is the primary
+		// surface for anything that isn't a direct reaction to
+		// Daybook already being on screen. Frequent/time-sensitive
+		// items (Show, SOD/EOD/SOM, Snooze) stay top-level and
+		// un-buried; everything else groups into a submenu by domain
+		// (Meetings/Reports/Ledger) rather than by FR number or
+		// chronology.
+		m := fyne.NewMenu("Dunzo",
+			fyne.NewMenuItem("Show", func() { refreshOpenItems(); w4.Show() }),
+			fyne.NewMenuItemSeparator(),
+			fyne.NewMenuItem("Start of Day...", func() { showSODWindow(a) }),
+			fyne.NewMenuItem("End of Day...", func() { showEODWindow(a) }),
+			fyne.NewMenuItem("Start of Month...", func() { showSOMWindow(a) }),
+			fyne.NewMenuItem("Snooze 15m", func() { Snooze(15 * time.Minute) }),
+			fyne.NewMenuItemSeparator(),
+			meetingsItem,
+			reportsItem,
+			ledgerItem,
+			fyne.NewMenuItemSeparator(),
+			fyne.NewMenuItem("Category Legend...", func() { showCategoryLegend(a) }),
+			fyne.NewMenuItem("Settings...", func() { showSettings(a) }),
 		)
 		desk.SetSystemTrayMenu(m)
 	}
@@ -590,22 +621,6 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	w4.Show()
 
 	return w4
-}
-
-func getGoals() []string {
-	_, lgr := getLedger()
-	fmt.Println("[FAKE] show today's dunnits")
-	fmt.Println(lgr)
-	goals := []string{}
-	f, _ := os.Open(lgr)
-	defer f.Close()
-	// Splits on newlines by default.
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() { // https://golang.org/pkg/bufio/#Scanner.Scan
-		if ln := scanner.Text(); strings.Contains(ln, " GOAL ") { goals = append(goals, ln) }
-	}
-	fmt.Println(goals)
-	return goals
 }
 
 // TODO Look over last month's most-used tags. May need to support a list of non-work topics
