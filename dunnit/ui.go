@@ -130,6 +130,7 @@ func defaultSnoozeDuration() time.Duration {
 }
 
 func recordActivity(text, category string) {
+	text = strings.TrimSpace(text)
 	log.Println("Content was:", text)
 	fpath, fname := getLedger()
 	if _, err := os.Stat(fpath); os.IsNotExist(err) {
@@ -523,7 +524,19 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		for _, cat := range cats {
 			completedBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
 			for _, item := range grouped[cat] {
-				completedBox.Add(widget.NewLabel("- " + item.Text))
+				item := item // capture
+				row := container.NewBorder(nil, nil, nil,
+					newHoverButton("✏️", "Edit", func() {
+						showEditItemDialog(w4, item, func() {
+							fyne.Do(func() {
+								refreshCompleted()
+								refreshLastDone()
+								itemsAccordion.Refresh()
+							})
+						})
+					}),
+					widget.NewLabel("- "+item.Text))
+				completedBox.Add(row)
 			}
 		}
 		completedBox.Refresh()
@@ -612,16 +625,25 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	refreshLastDone()
 
 	dittoBtn := widget.NewButton("Ditto", func() {
-		// Ditto now logs an ONGOING entry for the last recorded
-		// text, rather than just copying it into the input box
-		// under whatever category happens to be selected --
-		// repeating "still working on X" isn't the same as a
-		// fresh DONE each time.
-		if txt := lastEntryText(); txt != "" {
-			recordActivity(withMins(txt), "ONGOING")
+		// Ditto extends the last DONE item: logs a fresh DONE entry
+		// with the same text (so it looks freshly completed again),
+		// and rewrites the *original* DONE line's category to ONGOING
+		// (it was actually still being worked on, not really "done"
+		// at that point -- semantically this is "extend", though
+		// that word is never shown to the user, it's just quiet
+		// historical editing of an append-only-in-spirit ledger).
+		// Deliberately keyed off the last *DONE* entry specifically
+		// (lastDoneItem), not lastEntryText's "last logged line of any
+		// category" -- Ditto should never accidentally repeat/extend
+		// a RISK or other non-DONE entry just because it happened to
+		// be logged more recently.
+		if item, ok := lastDoneItem(); ok {
+			replaceLedgerLineCategoryAt(item.LineIndex, "ONGOING")
+			recordActivity(withMins(item.Text), "DONE")
 			minsInput.SetText("")
 			refreshOpenItems()
 			refreshCompleted()
+			refreshLastDone()
 		}
 	})
 	lastDoneRow := container.NewHBox(dittoBtn, lastDoneLabel)

@@ -8,6 +8,13 @@ import "strings"
 type OpenItem struct {
 	Category string // one of openTrackedCategories
 	Text     string
+	// LineIndex is the 0-based index of this item's originating line
+	// within readLedgerLines(), populated by getCategoryGroupItems
+	// for Daybook's inline Edit (pencil) action -- lets
+	// replaceLedgerLineTextAt target the exact line even if other
+	// lines share the same category+text. Left zero (unused) by
+	// getOpenItems/parseOpenItems, which don't need it.
+	LineIndex int
 }
 
 // openTrackedCategories are the categories tracked as "open items"
@@ -159,6 +166,27 @@ func categoryPlural(cat string) string {
 	return cat + "s"
 }
 
+// lastDoneItem returns the most recently logged DONE entry (text with
+// any "(via CATEGORY)" suffix stripped, plus its LineIndex into
+// readLedgerLines() for in-place rewriting), or ok=false if there is
+// no DONE entry logged yet today. Used by Ditto (ui.go) so it only
+// ever repeats/extends the last *DONE* item, not whatever category
+// happens to be most recent overall (e.g. a RISK logged afterward).
+func lastDoneItem() (item OpenItem, ok bool) {
+	lines := readLedgerLines()
+	for i := len(lines) - 1; i >= 0; i-- {
+		cat, text, lineOk := parseLedgerLine(lines[i])
+		if !lineOk || cat != "DONE" {
+			continue
+		}
+		for _, srcCat := range openTrackedCategories {
+			text = strings.TrimSuffix(text, convertedSuffix(srcCat))
+		}
+		return OpenItem{Category: cat, Text: text, LineIndex: i}, true
+	}
+	return OpenItem{}, false
+}
+
 // getCompletedItems returns today's DONE entries, in the order they
 // were logged, for Daybook's collapsible "Completed" section. The
 // "(via CATEGORY)" suffix (added when an open item is converted via
@@ -209,7 +237,7 @@ func getCategoryGroupItems(group string) []OpenItem {
 		codes[c] = true
 	}
 	var out []OpenItem
-	for _, line := range readLedgerLines() {
+	for i, line := range readLedgerLines() {
 		cat, text, ok := parseLedgerLine(line)
 		if !ok || !codes[cat] {
 			continue
@@ -217,7 +245,7 @@ func getCategoryGroupItems(group string) []OpenItem {
 		for _, srcCat := range openTrackedCategories {
 			text = strings.TrimSuffix(text, convertedSuffix(srcCat))
 		}
-		out = append(out, OpenItem{Category: cat, Text: text})
+		out = append(out, OpenItem{Category: cat, Text: text, LineIndex: i})
 	}
 	return out
 }
