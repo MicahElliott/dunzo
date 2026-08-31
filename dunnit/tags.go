@@ -2,6 +2,7 @@ package dun
 
 import (
 	"bufio"
+	"math"
 	"os"
 	"regexp"
 	"sort"
@@ -88,27 +89,39 @@ func scanAllTags() []string {
 	return tags
 }
 
-// tagStat tracks how often and how recently a tag has been used,
-// for commonAndRecentTags's blended common/recent ranking.
-type tagStat struct {
-	count    int
-	lastSeen time.Time
-}
+// tagRecencyHalfLife controls how fast a tag's contribution to
+// commonAndRecentTags's score decays with age. Each occurrence's
+// weight halves every tagRecencyHalfLife days, so tags stop showing
+// up in "common/recent" once they've been unused for a while, no
+// matter how many times they were used long ago.
+const tagRecencyHalfLife = 14.0
 
 // commonAndRecentTags returns up to limit tags from ledger history,
 // ranked by a blended score of frequency and recency -- leaning
 // somewhat more toward recent tags than pure frequency would, per
 // Micah's preference, rather than pure "most common of all time"
 // (which tends to entrench old tags and never surface newer ones).
-// Score = count + a recency bonus that decays with days since last
-// use (so a tag used once yesterday can outrank one used many times
-// months ago, but a heavily-used tag still generally wins over one
-// used just once recently).
+// Each occurrence of a tag contributes a weight that exponentially
+// decays with the age of that occurrence (half-life
+// tagRecencyHalfLife days) -- so a tag's score is dominated by its
+// recent usage, and heavy historical-but-stale usage fades away
+// rather than permanently outranking genuinely recent tags. (Bug fix
+// 2026-08-31: the previous version added an unbounded lifetime count
+// to a recency bonus capped at 14, so any tag used enough times ever
+// would permanently outrank newer tags regardless of staleness.)
 func commonAndRecentTags(limit int) []string {
-	stats := map[string]*tagStat{}
+	scores := map[string]float64{}
 	now := time.Now()
 	for _, path := range allLedgerFiles() {
 		date := ledgerFileDate(path)
+		if date == nil {
+			continue
+		}
+		daysSince := now.Sub(*date).Hours() / 24
+		if daysSince < 0 {
+			daysSince = 0
+		}
+		weight := math.Pow(0.5, daysSince/tagRecencyHalfLife)
 		f, err := os.Open(path)
 		if err != nil {
 			continue
@@ -116,15 +129,7 @@ func commonAndRecentTags(limit int) []string {
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
 			for _, tag := range extractTags(scanner.Text()) {
-				st := stats[tag]
-				if st == nil {
-					st = &tagStat{}
-					stats[tag] = st
-				}
-				st.count++
-				if date != nil && date.After(st.lastSeen) {
-					st.lastSeen = *date
-				}
+				scores[tag] += weight
 			}
 		}
 		f.Close()
@@ -134,14 +139,9 @@ func commonAndRecentTags(limit int) []string {
 		tag   string
 		score float64
 	}
-	var all []scored
-	for tag, st := range stats {
-		daysSince := 9999.0
-		if !st.lastSeen.IsZero() {
-			daysSince = now.Sub(st.lastSeen).Hours() / 24
-		}
-		recencyBonus := 14.0 / (daysSince + 1)
-		all = append(all, scored{tag: tag, score: float64(st.count) + recencyBonus})
+	all := make([]scored, 0, len(scores))
+	for tag, score := range scores {
+		all = append(all, scored{tag: tag, score: score})
 	}
 	sort.Slice(all, func(i, j int) bool {
 		if all[i].score != all[j].score {

@@ -62,6 +62,7 @@ func showSODWindow(a fyne.App) {
 
 	content := container.NewVBox(
 		widget.NewLabel("Good morning! Here's where things stand:"),
+		streakLabel(),
 		container.NewVScroll(listBox),
 		container.NewBorder(nil, nil, newItemCat, addBtn, newItemText),
 		widget.NewButton("Done", func() { w.Close() }),

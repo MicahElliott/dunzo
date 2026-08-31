@@ -63,6 +63,17 @@ type Config struct {
 	// tray menu also offers a few fixed alternatives (15/30/60) via a
 	// submenu regardless of this setting.
 	SnoozeMinutes int `toml:"snooze_minutes"`
+
+	// DoNotDisturb (FR-27) is a manual on/off flag the user toggles
+	// from the tray menu -- while true, the periodic capture nudge
+	// (sched.go) is suppressed entirely, same as an indefinite
+	// Snooze. Kept simple deliberately: no OS-level DND/screen-share
+	// detection (there's no stable public API for that on macOS, and
+	// it was decided not to build a heuristic file-based guess
+	// either) -- just a manual toggle the user flips themselves.
+	// Persisted so it survives app restarts. Only gates the periodic
+	// nudge, not SOD/EOD/meeting nudges, same scope as Snooze.
+	DoNotDisturb bool `toml:"do_not_disturb"`
 }
 
 // defaultConfig mirrors the values from dunnit's config-example.zsh.

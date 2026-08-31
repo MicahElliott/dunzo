@@ -80,6 +80,23 @@ func SnoozedUntil() time.Time {
 	return snoozedUntil
 }
 
+// IsDoNotDisturb reports whether the user has manually toggled Do Not
+// Disturb on (FR-27) -- while true, the periodic capture nudge is
+// suppressed entirely, same scope as Snooze.
+func IsDoNotDisturb() bool {
+	return LoadConfig().DoNotDisturb
+}
+
+// SetDoNotDisturb persists the Do Not Disturb flag (FR-27) to
+// config.toml so it survives app restarts.
+func SetDoNotDisturb(on bool) {
+	cfg := LoadConfig()
+	cfg.DoNotDisturb = on
+	if err := writeConfig(cfg); err != nil {
+		log.Println("Error saving Do Not Disturb setting:", err)
+	}
+}
+
 // defaultSnoozeDuration returns the configured default snooze
 // duration (cfg.SnoozeMinutes), falling back to 15 minutes if unset/
 // invalid.
@@ -591,6 +608,16 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		snoozeItem := fyne.NewMenuItem("Snooze", func() { Snooze(defaultSnoozeDuration()) })
 		snoozeItem.ChildMenu = snoozeMenu
 
+		var dndItem *fyne.MenuItem
+		var m *fyne.Menu
+		dndItem = fyne.NewMenuItem("Do Not Disturb", func() {
+			on := !dndItem.Checked
+			SetDoNotDisturb(on)
+			dndItem.Checked = on
+			desk.SetSystemTrayMenu(m)
+		})
+		dndItem.Checked = IsDoNotDisturb()
+
 		// Since Daybook is normally hidden and only pops up briefly
 		// (per Micah), the tray menu -- not Daybook -- is the primary
 		// surface for anything that isn't a direct reaction to
@@ -599,7 +626,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		// un-buried; everything else groups into a submenu by domain
 		// (Meetings/Reports/Ledger) rather than by FR number or
 		// chronology.
-		m := fyne.NewMenu("Dunzo",
+		m = fyne.NewMenu("Dunzo",
 			fyne.NewMenuItem("Show", func() {
 				refreshOpenItems()
 				w4.Show()
@@ -610,6 +637,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			fyne.NewMenuItem("End of Day...", func() { showEODWindow(a) }),
 			fyne.NewMenuItem("Start of Month...", func() { showSOMWindow(a) }),
 			snoozeItem,
+			dndItem,
 			fyne.NewMenuItemSeparator(),
 			meetingsItem,
 			reportsItem,

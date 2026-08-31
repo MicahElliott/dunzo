@@ -67,6 +67,9 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 			if !SnoozedUntil().IsZero() {
 				return
 			}
+			if IsDoNotDisturb() {
+				return
+			}
 			a.SendNotification(fyne.NewNotification(
 				"Dunzo", "What are you working on?"))
 			fyne.Do(func() {
