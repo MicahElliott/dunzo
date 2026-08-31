@@ -68,17 +68,22 @@ var Categories = []Category{
 	{"✔️", "DONE", "Something you completed.", "now", "positive"},
 	{"⏩", "ONGOING", "Still working on something (e.g. what \"Ditto\" now logs) -- not finished yet.", "now", ""},
 	{"💡", "IDEA", "A new idea worth capturing.", "now", ""},
-	{"❓", "QUESTION", "An open question to follow up on.", "now", ""},
-	{"🧠", "TIL", "Today I Learned -- something new you picked up.", "now", "positive"},
-	{"⏳", "WAITING", "Blocked on someone/something else; not actionable right now.", "now", ""},
+	{"🌱", "TIL", "Today I Learned -- something new you picked up.", "now", "positive"},
 	{"🙌", "KUDOS", "Recognition given to someone else, or received from someone else.", "now", "positive"},
 	{"🏆", "WIN", "A win worth celebrating.", "now", "positive"},
-	{"🔧", "FIXME", "Something broken that needs fixing.", "now", "negative"},
-	{"⚠️", "RISK", "A risk worth flagging/tracking.", "now", "negative"},
 
-	// plan: future-facing
+	// plan: future-facing -- includes the "open item, needs follow-up
+	// or resolution" categories (WAITING/QUESTION/FIXME/RISK moved
+	// here from "now", alongside TODO/GOAL, since they share the same
+	// pattern: logged now, tracked as open, resolved/reviewed later
+	// via SOD/SOM/Daybook's Upcoming list -- not truly "day-to-day
+	// capture" like DONE/TIL/etc).
 	{"📌", "TODO", "A small, tight, near-term item -- actively encouraged.", "plan", ""},
 	{"🎯", "GOAL", "A bigger overarching aim, reviewed on a longer cadence (not daily).", "plan", ""},
+	{"❓", "QUESTION", "An open question to follow up on.", "plan", ""},
+	{"⏳", "WAITING", "Blocked on someone/something else; not actionable right now.", "plan", ""},
+	{"🔧", "FIXME", "Something broken that needs fixing.", "plan", "negative"},
+	{"⚠️", "RISK", "A risk worth flagging/tracking.", "plan", "negative"},
 	{"📅", "MEETING", "Scratch agenda-builder notes for an upcoming meeting (tag-scoped).", "plan", ""},
 	{"🕰️", "SOMEDAY", "Something you might want to do eventually, not now (also where stalled TODOs/GOALs land).", "plan", ""},
 	{"🏎️", "OPTIMIZE", "Something working but worth improving/speeding up.", "plan", ""},

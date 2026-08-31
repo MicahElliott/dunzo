@@ -9,6 +9,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
 )
 
 // tagPattern matches a "#tag" token: '#' followed by one or more
@@ -210,4 +214,28 @@ func currentTagFragment(text string, cursor int) (start int, fragment string, ok
 
 func isTagBreak(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\n'
+}
+
+// showAllTagsWindow shows every distinct tag ever seen across ledger
+// history (KnownTags(), full scan) in a standalone scrollable window
+// -- the escape hatch from Daybook's "Common tags:" line, which only
+// shows a handful by blended frequency/recency score. Editing/
+// deleting a tag across all its historical occurrences is a possible
+// future extension (see tags.go's package doc) -- not implemented
+// here, this is read-only.
+func showAllTagsWindow(a fyne.App) {
+	w := a.NewWindow("Dunzo: All Tags")
+
+	tags := KnownTags()
+	list := container.NewVBox()
+	if len(tags) == 0 {
+		list.Add(widget.NewLabel("No tags found in ledger history yet."))
+	}
+	for _, tag := range tags {
+		list.Add(widget.NewLabel(tag))
+	}
+
+	w.SetContent(container.NewVScroll(list))
+	w.Resize(fyne.NewSize(300, 500))
+	w.Show()
 }

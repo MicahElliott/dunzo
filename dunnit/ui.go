@@ -426,24 +426,26 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 	fmt.Println(input.MinSize())
 
-	// openItemsBox displays currently-open TODO/GOAL lines together
-	// under one "Upcoming" heading (FR-07), split into TODO/GOAL
-	// sub-sections (mirroring showSODWindow's layout, for
-	// consistency) each with "Done" (convert to DONE) and "Postpone"
-	// (defer to SOMEDAY, keeping the list from growing unbounded)
-	// actions. refreshOpenItems rebuilds it from the current ledger
-	// contents; called after any save/convert/postpone action so the
-	// list stays in sync.
+	// openItemsBox displays currently-open item lines together under
+	// one "Upcoming" heading (FR-07, extended for WAITING/QUESTION/
+	// FIXME/RISK), split into per-category sub-sections, each with
+	// "Done" (convert to DONE) and "Postpone" (defer to SOMEDAY,
+	// keeping the list from growing unbounded) actions.
+	// refreshOpenItems rebuilds it from the current ledger contents;
+	// called after any save/convert/postpone action so the list stays
+	// in sync. Wrapped in a widget.Accordion (itemsAccordion, below)
+	// so it can be collapsed out of the way once reviewed.
 	openItemsBox := container.NewVBox()
 	var refreshOpenItems func()
+	var refreshCompleted func() // forward decl -- used inside refreshOpenItems's Done button, defined below
 	refreshOpenItems = func() {
 		openItemsBox.RemoveAll()
 		items := getOpenItems()
 		if len(items) == 0 {
+			openItemsBox.Add(widget.NewLabel("Nothing open right now."))
 			openItemsBox.Refresh()
 			return
 		}
-		openItemsBox.Add(widget.NewLabelWithStyle("Upcoming", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
 		addRow := func(item OpenItem) {
 			catLabel := canvas.NewText(item.Category, theme.Color(theme.ColorNameForeground))
 			catLabel.TextStyle = fyne.TextStyle{Monospace: true}
@@ -458,34 +460,50 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 						recordConvertedDone(item)
 						refreshLastDunnit()
 						refreshOpenItems()
+						refreshCompleted()
 					}),
 				),
 				widget.NewLabel(item.Text))
 			openItemsBox.Add(row)
 		}
-		var todos, goals []OpenItem
-		for _, item := range items {
-			if item.Category == "GOAL" {
-				goals = append(goals, item)
-			} else {
-				todos = append(todos, item)
-			}
-		}
-		if len(todos) > 0 {
-			openItemsBox.Add(widget.NewLabelWithStyle("TODOs", fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
-			for _, item := range todos {
-				addRow(item)
-			}
-		}
-		if len(goals) > 0 {
-			openItemsBox.Add(widget.NewLabelWithStyle("GOALs", fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
-			for _, item := range goals {
+		cats, grouped := groupOpenItemsByCategory(items)
+		for _, cat := range cats {
+			openItemsBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
+			for _, item := range grouped[cat] {
 				addRow(item)
 			}
 		}
 		openItemsBox.Refresh()
 	}
 	refreshOpenItems()
+
+	// completedBox displays today's DONE entries -- since Daybook no
+	// longer shows a running list of everything logged today, this
+	// restores visibility into today's finished items. Also
+	// collapsible, placed right below Upcoming in the same accordion.
+	completedBox := container.NewVBox()
+	refreshCompleted = func() {
+		completedBox.RemoveAll()
+		done := getCompletedItems()
+		if len(done) == 0 {
+			completedBox.Add(widget.NewLabel("Nothing completed yet today."))
+			completedBox.Refresh()
+			return
+		}
+		for _, text := range done {
+			completedBox.Add(widget.NewLabel("- " + text))
+		}
+		completedBox.Refresh()
+	}
+	refreshCompleted()
+
+	// Upcoming/Completed are both collapsible (via widget.Accordion)
+	// so either can be tucked out of the way once reviewed, freeing
+	// room for the other.
+	upcomingItem := widget.NewAccordionItem("Upcoming", openItemsBox)
+	upcomingItem.Open = true
+	completedItem := widget.NewAccordionItem("Completed", completedBox)
+	itemsAccordion := widget.NewAccordion(upcomingItem, completedItem)
 
 	saveEntry := func() {
 		if strings.TrimSpace(input.Text) == "" {
@@ -496,6 +514,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		minsInput.SetText("")
 		refreshLastDunnit()
 		refreshOpenItems()
+		refreshCompleted()
 	}
 	input.OnSubmitted = func(string) { saveEntry() }
 	minsInput.OnSubmitted = func(string) { saveEntry() }
@@ -522,15 +541,25 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		widget.NewButton("Help...", func() { showHelp(a) }),
 	)
 
+	// showAllTagsBtn opens a standalone window listing every known
+	// tag (KnownTags(), full ledger-history scan) -- "Common tags:"
+	// only shows the top few by commonAndRecentTags's blended
+	// score, this is the escape hatch to see everything. (Editing/
+	// deleting tags across history is a possible future extension,
+	// not implemented here -- see tags.go.)
+	commonTagsRow := container.NewBorder(nil, nil, nil,
+		widget.NewButton("Show all", func() { showAllTagsWindow(a) }),
+		widget.NewLabel("Common tags: "+strings.Join(commonAndRecentTags(8), " ")))
+
 	content := container.NewVBox(
 		widget.NewLabel("What would you like to record?"),
 		lastDunnitLabel,
 		doneWrapper,
 		// category, input,
-		widget.NewLabel("Common tags: "+strings.Join(commonAndRecentTags(8), " ")),
+		commonTagsRow,
 		buttons,
 		widget.NewSeparator(),
-		openItemsBox,
+		itemsAccordion,
 	)
 	log.Println(content)
 
@@ -538,6 +567,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// 	label1, value1, label2, value2, content)
 
 	w4.SetContent(content)
+	w4.Resize(fyne.NewSize(560, 400))
 	w4.SetCloseIntercept(func() { w4.Hide() })
 	w4.Canvas().AddShortcut(&desktop.CustomShortcut{
 		KeyName:  fyne.KeyW,
@@ -581,6 +611,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 				showUndoEditLastEntry(a, func() {
 					refreshLastDunnit()
 					refreshOpenItems()
+					refreshCompleted()
 				})
 			}),
 			fyne.NewMenuItem("Search...", func() { showSearchDialog(a) }),
@@ -629,6 +660,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		m = fyne.NewMenu("Dunzo",
 			fyne.NewMenuItem("Show", func() {
 				refreshOpenItems()
+				refreshCompleted()
 				w4.Show()
 				w4.RequestFocus()
 			}),

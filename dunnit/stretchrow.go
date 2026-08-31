@@ -5,6 +5,19 @@ import (
 	"fyne.io/fyne/v2/theme"
 )
 
+// stretchMinWidth is the nominal minimum width contributed by the
+// stretch object to the row's own MinSize -- deliberately small and
+// fixed, NOT the stretch object's actual MinSize(). A widget.Entry's
+// MinSize() grows with the length of its current text content, so
+// using it directly here would make the whole row (and therefore the
+// window, since Fyne sizes windows from content MinSize) grow/shrink
+// based on what's currently typed into the entry -- the bug behind
+// Daybook's width following the longest entry ever typed and
+// spuriously showing a horizontal scrollbar. The stretch object is
+// still given all remaining width at actual layout time (see
+// Layout), just not counted by its content-dependent MinSize here.
+const stretchMinWidth = 80
+
 // stretchRowLayout lays out objects left-to-right (like
 // container.NewHBox), except one designated object ("stretch") is
 // given all the remaining width instead of just its MinSize -- every
@@ -61,7 +74,11 @@ func (s *stretchRowLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
 			continue
 		}
 		m := o.MinSize()
-		totalW += m.Width
+		w := m.Width
+		if o == s.stretch {
+			w = stretchMinWidth
+		}
+		totalW += w
 		if !first {
 			totalW += theme.Padding()
 		}

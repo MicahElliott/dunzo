@@ -2,15 +2,33 @@ package dun
 
 import "strings"
 
-// OpenItem is a not-yet-resolved TODO or GOAL line pulled from
-// today's ledger (FR-07), shown together under Daybook's "Upcoming"
-// section.
+// OpenItem is a not-yet-resolved item pulled from today's ledger
+// (FR-07, extended for the WAITING/QUESTION/FIXME/RISK follow-up):
+// shown together under Daybook's "Upcoming" section and in SOD/SOM.
 type OpenItem struct {
-	Category string // "TODO" or "GOAL"
+	Category string // one of openTrackedCategories
 	Text     string
 }
 
-// resolvingCategories are the categories a TODO/GOAL item can be
+// openTrackedCategories are the categories tracked as "open items"
+// needing eventual follow-up/resolution -- shown in Daybook's
+// Upcoming section and SOD/SOM, and resolvable via the Done/Postpone
+// actions. TODO/GOAL were the original FR-07 set; WAITING/QUESTION/
+// FIXME/RISK share the same "logged now, tracked as open, resolved
+// later" pattern (unlike day-to-day capture categories like DONE/
+// TIL), so they're tracked the same way.
+var openTrackedCategories = []string{"TODO", "GOAL", "WAITING", "QUESTION", "FIXME", "RISK"}
+
+func isOpenTrackedCategory(cat string) bool {
+	for _, c := range openTrackedCategories {
+		if cat == c {
+			return true
+		}
+	}
+	return false
+}
+
+// resolvingCategories are the categories an open item can be
 // "resolved" into from the Upcoming list, and what button triggers
 // each: DONE via the "Done" button (actually completed), SOMEDAY via
 // the "Postpone" button (deliberately deferred rather than pretending
@@ -20,10 +38,10 @@ type OpenItem struct {
 var resolvingCategories = []string{"DONE", "SOMEDAY"}
 
 // convertedSuffix marks a resolving line (DONE or SOMEDAY) as having
-// been generated from an open TODO/GOAL, so parseOpenItems can
-// recognize it and exclude the original from the "open" list. Kept as
-// an exact, greppable suffix rather than a separate marker file, to
-// stay append-only/plain-text (per project's ledger design).
+// been generated from an open item, so parseOpenItems can recognize
+// it and exclude the original from the "open" list. Kept as an exact,
+// greppable suffix rather than a separate marker file, to stay
+// append-only/plain-text (per project's ledger design).
 func convertedSuffix(category string) string {
 	return " (via " + category + ")"
 }
@@ -39,9 +57,10 @@ func parseLedgerLine(line string) (category, text string, ok bool) {
 	return parts[1], parts[2], true
 }
 
-// parseOpenItems scans ledger lines for TODO/GOAL entries that have
-// not yet been resolved (converted to DONE or postponed to SOMEDAY,
-// via recordConvertedDone/recordPostponed), in first-seen order.
+// parseOpenItems scans ledger lines for open-tracked-category entries
+// that have not yet been resolved (converted to DONE or postponed to
+// SOMEDAY, via recordConvertedDone/recordPostponed), in first-seen
+// order.
 func parseOpenItems(lines []string) []OpenItem {
 	var open []OpenItem
 	resolved := make(map[string]bool) // "CATEGORY\x00text" -> true
@@ -59,7 +78,7 @@ func parseOpenItems(lines []string) []OpenItem {
 			}
 		}
 		if isResolving {
-			for _, srcCat := range []string{"TODO", "GOAL"} {
+			for _, srcCat := range openTrackedCategories {
 				if suffix := convertedSuffix(srcCat); strings.HasSuffix(text, suffix) {
 					orig := strings.TrimSuffix(text, suffix)
 					resolved[srcCat+"\x00"+orig] = true
@@ -67,7 +86,7 @@ func parseOpenItems(lines []string) []OpenItem {
 			}
 			continue
 		}
-		if cat == "TODO" || cat == "GOAL" {
+		if isOpenTrackedCategory(cat) {
 			open = append(open, OpenItem{Category: cat, Text: text})
 		}
 	}
@@ -81,22 +100,69 @@ func parseOpenItems(lines []string) []OpenItem {
 	return result
 }
 
-// getOpenItems returns today's open (unresolved) TODO/GOAL items.
+// getOpenItems returns today's open (unresolved) tracked items.
 func getOpenItems() []OpenItem {
 	return parseOpenItems(readLedgerLines())
 }
 
-// recordConvertedDone logs a DONE entry referencing an original
-// TODO/GOAL item's text, marking it as resolved (FR-07). The
-// original line is left untouched (append-only ledger design).
+// recordConvertedDone logs a DONE entry referencing an original open
+// item's text, marking it as resolved (FR-07). The original line is
+// left untouched (append-only ledger design).
 func recordConvertedDone(item OpenItem) {
 	recordActivity(item.Text+convertedSuffix(item.Category), "DONE")
 }
 
-// recordPostponed logs a SOMEDAY entry referencing an original
-// TODO/GOAL item's text, marking it as resolved without pretending it
-// was completed -- for deliberately deferring an item so the Upcoming
+// recordPostponed logs a SOMEDAY entry referencing an original open
+// item's text, marking it as resolved without pretending it was
+// completed -- for deliberately deferring an item so the Upcoming
 // list doesn't grow unbounded. The original line is left untouched.
 func recordPostponed(item OpenItem) {
 	recordActivity(item.Text+convertedSuffix(item.Category), "SOMEDAY")
+}
+
+// groupOpenItemsByCategory buckets items by category, preserving
+// openTrackedCategories order, and skips empty buckets. Shared by
+// Daybook's Upcoming section, SOD, and SOM so all three list open
+// items (TODO/GOAL/WAITING/QUESTION/FIXME/RISK) the same way, rather
+// than each hardcoding its own TODO-vs-GOAL binary split.
+func groupOpenItemsByCategory(items []OpenItem) (categories []string, grouped map[string][]OpenItem) {
+	grouped = make(map[string][]OpenItem)
+	for _, item := range items {
+		grouped[item.Category] = append(grouped[item.Category], item)
+	}
+	for _, cat := range openTrackedCategories {
+		if len(grouped[cat]) > 0 {
+			categories = append(categories, cat)
+		}
+	}
+	return categories, grouped
+}
+
+// categoryPlural returns a simple plural label for a category code,
+// used as a sub-heading (e.g. "TODOs", "GOALs", "WAITINGs" -- good
+// enough for these short all-caps codes, no need for real pluralization
+// rules).
+func categoryPlural(cat string) string {
+	return cat + "s"
+}
+
+// getCompletedItems returns today's DONE entries, in the order they
+// were logged, for Daybook's collapsible "Completed" section. The
+// "(via CATEGORY)" suffix (added when an open item is converted via
+// the Upcoming list's Done button, see convertedSuffix) is stripped
+// for a cleaner display -- the ledger itself keeps the full text as
+// written, this only affects what's shown here.
+func getCompletedItems() []string {
+	var out []string
+	for _, line := range readLedgerLines() {
+		cat, text, ok := parseLedgerLine(line)
+		if !ok || cat != "DONE" {
+			continue
+		}
+		for _, srcCat := range openTrackedCategories {
+			text = strings.TrimSuffix(text, convertedSuffix(srcCat))
+		}
+		out = append(out, text)
+	}
+	return out
 }
