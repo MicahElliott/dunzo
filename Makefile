@@ -1,4 +1,4 @@
-.PHONY: run package clean vet
+.PHONY: run package clean vet release
 
 build: dunzo
 
@@ -19,3 +19,27 @@ vet:
 clean:
 	rm -f dunzo
 	rm -rf Dunzo.app
+	rm -f Dunzo-*-macos.zip
+
+# Cuts a local macOS-only release: packages Dunzo.app, zips it, tags
+# the current commit, pushes the tag, and creates a GitHub Release
+# with the zip attached (via `gh`, using auto-generated notes from
+# commits since the last tag). No CI/GoReleaser involved -- this is
+# purely a local, manual-trigger convenience wrapper.
+#
+# Usage: make release VERSION=v0.1.0
+release:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Usage: make release VERSION=vX.Y.Z"; \
+		exit 1; \
+	fi
+	@if ! git diff --quiet || ! git diff --cached --quiet; then \
+		echo "Working tree has uncommitted changes -- commit or stash first."; \
+		exit 1; \
+	fi
+	$(MAKE) package
+	rm -f Dunzo-$(VERSION)-macos.zip
+	ditto -c -k --sequesterRsrc --keepParent Dunzo.app Dunzo-$(VERSION)-macos.zip
+	git tag $(VERSION)
+	git push origin $(VERSION)
+	gh release create $(VERSION) Dunzo-$(VERSION)-macos.zip --title "$(VERSION)" --generate-notes
