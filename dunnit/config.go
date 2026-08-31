@@ -74,6 +74,13 @@ type Config struct {
 	// Persisted so it survives app restarts. Only gates the periodic
 	// nudge, not SOD/EOD/meeting nudges, same scope as Snooze.
 	DoNotDisturb bool `toml:"do_not_disturb"`
+
+	// RecurringItems is the recurring-TODO/GOAL feature (see
+	// RECURRING-ITEMS-DESIGN-SEED.md): a small, hand-maintained list
+	// of items to be suggested (not auto-seeded) on a daily/weekly/
+	// monthly cadence. Daily/weekly are surfaced in SOD; monthly in
+	// SOM. Managed via showRecurringItemsDialog (recurring.go).
+	RecurringItems []RecurringItem `toml:"recurring_item"`
 }
 
 // defaultConfig mirrors the values from dunnit's config-example.zsh.

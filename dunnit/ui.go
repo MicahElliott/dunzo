@@ -59,6 +59,27 @@ func LastActivityAt() time.Time {
 	return lastActivityAt
 }
 
+// mainInputEntry holds the Daybook window's main text-entry widget,
+// captured once by BuildMainWindow, so FocusMainInput (called
+// whenever Daybook is raised, e.g. by sched.go's nudges and the tray
+// menu's "Show") can request keyboard focus land there directly,
+// rather than wherever focus happened to be left (or nowhere).
+var mainInputEntry *closeShortcutEntry
+
+// FocusMainInput requests keyboard focus on Daybook's main entry box,
+// if it's been built yet. Safe to call even before BuildMainWindow
+// has run (no-op).
+func FocusMainInput() {
+	if mainInputEntry == nil {
+		return
+	}
+	fyne.Do(func() {
+		if c := fyne.CurrentApp().Driver().CanvasForObject(mainInputEntry); c != nil {
+			c.Focus(mainInputEntry)
+		}
+	})
+}
+
 // snoozedUntil tracks a "not now, remind me later" request (FR-26) --
 // while non-zero and in the future, the periodic capture nudge
 // (sched.go) skips firing. Doesn't affect other nudges (SOD/EOD/
@@ -291,6 +312,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 	input := newCloseShortcutEntry(fyne.KeyW, fyne.KeyModifierShortcutDefault, func() { w4.Hide() })
 	input.SetPlaceHolder("Enter text...")
+	mainInputEntry = input
 	// input.Resize(fyne.NewSize(100.0, 50.0))
 
 	// Tag autocomplete (FR-10): as the user types a "#tag" fragment,
@@ -429,7 +451,9 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// so it can be collapsed out of the way once reviewed.
 	openItemsBox := container.NewVBox()
 	var refreshOpenItems func()
-	var refreshCompleted func() // forward decl -- used inside refreshOpenItems's Done button, defined below
+	var refreshCompleted func()   // forward decl -- used inside refreshOpenItems's Done button, defined below
+	var refreshLastDone func()    // forward decl -- used inside refreshOpenItems's Done button and saveEntry, defined further below (needs lastDoneLabel)
+	var itemsAccordion *widget.Accordion // forward decl -- used inside refreshOpenItems's Done/Postpone/Discard buttons, defined below
 	refreshOpenItems = func() {
 		openItemsBox.RemoveAll()
 		items := getOpenItems()
@@ -443,16 +467,26 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 				container.NewHBox(
 					newHoverButton("❌", "Discard", func() {
 						recordDiscarded(item)
-						refreshOpenItems()
+						fyne.Do(func() {
+							refreshOpenItems()
+							itemsAccordion.Refresh()
+						})
 					}),
 					newHoverButton("🐌", "Postpone", func() {
 						recordPostponed(item)
-						refreshOpenItems()
+						fyne.Do(func() {
+							refreshOpenItems()
+							itemsAccordion.Refresh()
+						})
 					}),
 					newHoverButton("✔️", "Done", func() {
 						recordConvertedDone(item)
-						refreshOpenItems()
-						refreshCompleted()
+						fyne.Do(func() {
+							refreshOpenItems()
+							refreshCompleted()
+							refreshLastDone()
+							itemsAccordion.Refresh()
+						})
 					}),
 				),
 				widget.NewLabel("- "+item.Text))
@@ -469,34 +503,71 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	}
 	refreshOpenItems()
 
-	// completedBox displays today's DONE entries -- since Daybook no
-	// longer shows a running list of everything logged today, this
-	// restores visibility into today's finished items. Also
-	// collapsible, placed right below Upcoming in the same accordion.
+	// completedBox displays today's "now"-group entries (DONE/ONGOING/
+	// TIL/KUDOS/WIN -- not just DONE) grouped by category with
+	// per-category sub-headings, mirroring how Planned already splits
+	// TODO/GOAL/etc into their own sections (see groupOpenItemsByCategory).
+	// Also collapsible, placed right below Planned in the same accordion.
+	// Section is labeled "Activity" (not "Completed") since it covers
+	// all "now" cats, not just finished/DONE ones.
 	completedBox := container.NewVBox()
 	refreshCompleted = func() {
 		completedBox.RemoveAll()
-		done := getCompletedItems()
-		if len(done) == 0 {
-			completedBox.Add(widget.NewLabel("Nothing completed yet today."))
+		items := getCategoryGroupItems("now")
+		if len(items) == 0 {
+			completedBox.Add(widget.NewLabel("Nothing logged yet today."))
 			completedBox.Refresh()
 			return
 		}
-		for _, text := range done {
-			completedBox.Add(widget.NewLabel("- " + text))
+		cats, grouped := groupCategoryItemsByGroup("now", items)
+		for _, cat := range cats {
+			completedBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
+			for _, item := range grouped[cat] {
+				completedBox.Add(widget.NewLabel("- " + item.Text))
+			}
 		}
 		completedBox.Refresh()
 	}
 	refreshCompleted()
 
-	// Upcoming/Completed are both collapsible (via widget.Accordion)
-	// so either can be tucked out of the way once reviewed, freeing
-	// room for the other. Completed listed first (with Upcoming below
-	// it) per Micah's preferred ordering.
-	upcomingItem := widget.NewAccordionItem("Upcoming", openItemsBox)
-	completedItem := widget.NewAccordionItem("Completed", completedBox)
-	completedItem.Open = true
-	itemsAccordion := widget.NewAccordion(completedItem, upcomingItem)
+	// reflectionsBox displays today's "reflect"-group entries
+	// (IMPACT/MILESTONE/CAREER/FAIL/WASTED -- excludes the EODOnly
+	// SUMMARY/PRODUCTIVITY/MEETING_HOURS codes only in the sense that
+	// those are rare to see mid-day, though if present they'd still
+	// show here; EODOnly only gates the *picker*, not this readback),
+	// grouped by category with sub-headings, same pattern as
+	// Completed/Planned.
+	reflectionsBox := container.NewVBox()
+	var refreshReflections func()
+	refreshReflections = func() {
+		reflectionsBox.RemoveAll()
+		items := getCategoryGroupItems("reflect")
+		if len(items) == 0 {
+			reflectionsBox.Add(widget.NewLabel("Nothing reflected on yet today."))
+			reflectionsBox.Refresh()
+			return
+		}
+		cats, grouped := groupCategoryItemsByGroup("reflect", items)
+		for _, cat := range cats {
+			reflectionsBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
+			for _, item := range grouped[cat] {
+				reflectionsBox.Add(widget.NewLabel("- " + item.Text))
+			}
+		}
+		reflectionsBox.Refresh()
+	}
+	refreshReflections()
+
+	// Planned/Activity/Reflections are all collapsible (via
+	// widget.Accordion) so any can be tucked out of the way once
+	// reviewed. All three start collapsed -- Daybook pops up briefly
+	// (per Micah) and the last-DONE-item label + buttons row above
+	// already surface the most immediately relevant info, so nothing
+	// needs to auto-expand.
+	upcomingItem := widget.NewAccordionItem("Planned", openItemsBox)
+	completedItem := widget.NewAccordionItem("Activity", completedBox)
+	reflectionsItem := widget.NewAccordionItem("Reflections", reflectionsBox)
+	itemsAccordion = widget.NewAccordion(completedItem, upcomingItem, reflectionsItem)
 
 	saveEntry := func() {
 		if strings.TrimSpace(input.Text) == "" {
@@ -507,24 +578,14 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		minsInput.SetText("")
 		refreshOpenItems()
 		refreshCompleted()
+		refreshReflections()
+		refreshLastDone()
 	}
 	input.OnSubmitted = func(string) { saveEntry() }
 	minsInput.OnSubmitted = func(string) { saveEntry() }
 
 	buttons := container.NewHBox(
 		widget.NewButton("Save", saveEntry),
-		widget.NewButton("Ditto", func() {
-			// Ditto now logs an ONGOING entry for the last recorded
-			// text, rather than just copying it into the input box
-			// under whatever category happens to be selected --
-			// repeating "still working on X" isn't the same as a
-			// fresh DONE each time.
-			if txt := lastEntryText(); txt != "" {
-				recordActivity(withMins(txt), "ONGOING")
-				minsInput.SetText("")
-				refreshOpenItems()
-			}
-		}),
 		widget.NewButton("Snooze", func() {
 			Snooze(defaultSnoozeDuration())
 			w4.Hide()
@@ -532,21 +593,85 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		widget.NewButton("Help...", func() { showHelp(a) }),
 	)
 
+	// lastDoneLabel shows the most recently logged DONE entry's text
+	// just below the buttons row -- a quick "what did I just finish?"
+	// glance without opening the (now-collapsed-by-default) Activity
+	// section. dittoBtn sits immediately to its left since Ditto acts
+	// on that same "last entry" (see lastEntryText, which is the more
+	// general "last logged line of any category" used by Ditto itself
+	// -- lastDoneLabel specifically shows the last *DONE* one).
+	lastDoneLabel := widget.NewLabel("")
+	refreshLastDone = func() {
+		done := getCompletedItems()
+		if len(done) == 0 {
+			lastDoneLabel.SetText("(nothing completed yet today)")
+			return
+		}
+		lastDoneLabel.SetText("Last done: " + done[len(done)-1])
+	}
+	refreshLastDone()
+
+	dittoBtn := widget.NewButton("Ditto", func() {
+		// Ditto now logs an ONGOING entry for the last recorded
+		// text, rather than just copying it into the input box
+		// under whatever category happens to be selected --
+		// repeating "still working on X" isn't the same as a
+		// fresh DONE each time.
+		if txt := lastEntryText(); txt != "" {
+			recordActivity(withMins(txt), "ONGOING")
+			minsInput.SetText("")
+			refreshOpenItems()
+			refreshCompleted()
+		}
+	})
+	lastDoneRow := container.NewHBox(dittoBtn, lastDoneLabel)
+
 	// showAllTagsBtn opens a standalone window listing every known
 	// tag (KnownTags(), full ledger-history scan) -- "Frecent tags:"
 	// only shows the top few by commonAndRecentTags's blended
 	// frequency+recency score, this is the escape hatch to see
 	// everything. (Editing/deleting tags across history is a possible
 	// future extension, not implemented here -- see tags.go.)
+	//
+	// Each tag is rendered as a clickable blue tagLink (not plain
+	// text) -- clicking one inserts it at the cursor position in the
+	// main entry box and refocuses it, so tags can be added without
+	// typing "#" and waiting for autocomplete.
+	insertTagAtCursor := func(tag string) {
+		runes := []rune(input.Text)
+		col := input.CursorColumn
+		if col < 0 || col > len(runes) {
+			col = len(runes)
+		}
+		insert := tag
+		if col > 0 && !isTagBreak(runes[col-1]) {
+			insert = " " + insert
+		}
+		insert += " "
+		newText := string(runes[:col]) + insert + string(runes[col:])
+		input.SetText(newText)
+		input.CursorColumn = col + len([]rune(insert))
+		input.Refresh()
+		FocusMainInput()
+	}
+	frecentTags, frecentCounts := commonAndRecentTagsWithCounts(8)
+	frecentTagsRow := container.NewHBox(widget.NewLabel("Frecent tags:"))
+	for i, tag := range frecentTags {
+		tag := tag // capture
+		frecentTagsRow.Add(newTagLink(formatTagWithCount(tag, &tagStat{count: frecentCounts[i]}), func() {
+			insertTagAtCursor(tag)
+		}))
+	}
 	commonTagsRow := container.NewBorder(nil, nil, nil,
 		widget.NewButton("Show all", func() { showAllTagsWindow(a) }),
-		widget.NewLabel("Frecent tags: "+strings.Join(commonAndRecentTags(8), " ")))
+		frecentTagsRow)
 
 	content := container.NewVBox(
 		doneWrapper,
 		// category, input,
 		commonTagsRow,
 		buttons,
+		lastDoneRow,
 		widget.NewSeparator(),
 		itemsAccordion,
 	)
@@ -600,9 +725,14 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 				showUndoEditLastEntry(a, func() {
 					refreshOpenItems()
 					refreshCompleted()
+					refreshReflections()
+					refreshLastDone()
 				})
 			}),
 			fyne.NewMenuItem("Search...", func() { showSearchDialog(a) }),
+			fyne.NewMenuItem("Recurring Items...", func() {
+				showRecurringItemsDialog(a, w4)
+			}),
 			fyne.NewMenuItem("Daily Summary Doc...", func() {
 				go func() {
 					path, _, err := ensureDailySummaryDoc(time.Now())
@@ -649,8 +779,11 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			fyne.NewMenuItem("Show", func() {
 				refreshOpenItems()
 				refreshCompleted()
+				refreshReflections()
+				refreshLastDone()
 				w4.Show()
 				w4.RequestFocus()
+				FocusMainInput()
 			}),
 			fyne.NewMenuItemSeparator(),
 			fyne.NewMenuItem("Start of Day...", func() { showSODWindow(a) }),
@@ -670,6 +803,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	}
 
 	w4.Show()
+	FocusMainInput()
 
 	return w4
 }

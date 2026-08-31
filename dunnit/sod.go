@@ -2,6 +2,7 @@ package dun
 
 import (
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -63,6 +64,27 @@ func showSODWindow(a fyne.App) {
 	listScroll := container.NewVScroll(listBox)
 	listScroll.SetMinSize(fyne.NewSize(0, 260))
 
+	// Recurring items (daily/weekly cadence) suggested for today --
+	// see RECURRING-ITEMS-DESIGN-SEED.md. Surfaced as suggestions the
+	// user explicitly taps "Add" for, not auto-seeded.
+	recurringBox := container.NewVBox()
+	refreshRecurring := func() {
+		recurringBox.RemoveAll()
+		due := dueRecurringItems(LoadConfig(), time.Now(), "")
+		var dailyWeekly []RecurringItem
+		for _, r := range due {
+			if r.Cadence != "monthly" {
+				dailyWeekly = append(dailyWeekly, r)
+			}
+		}
+		if box := recurringItemsSuggestionBox(dailyWeekly, refreshList); box != nil {
+			recurringBox.Add(widget.NewLabelWithStyle("Recurring Items Due Today", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
+			recurringBox.Add(box)
+		}
+		recurringBox.Refresh()
+	}
+	refreshRecurring()
+
 	newItemCat := widget.NewSelect(openTrackedCategories, nil)
 	newItemCat.SetSelected("TODO")
 	newItemText := widget.NewEntry()
@@ -119,6 +141,7 @@ func showSODWindow(a fyne.App) {
 		recordActivity(text, newItemCat.Selected)
 		newItemText.SetText("")
 		refreshList() // rebuild the list in place, rather than closing/reopening the window
+		refreshRecurring()
 	}
 	newItemText.OnSubmitted = func(string) { addItem() }
 	addBtn := widget.NewButton("Add", addItem)
@@ -132,11 +155,11 @@ func showSODWindow(a fyne.App) {
 	entryRow := container.New(newStretchRowLayout(newItemText), newItemCat, newItemText, addBtn)
 
 	// Note: new items logged here go straight to the ledger, but
-	// Daybook's own "Upcoming" section only refreshes when Daybook
+	// Daybook's own "Planned" section only refreshes when Daybook
 	// itself is shown/interacted with -- so if Daybook is already
 	// open in the background, it won't reflect these until it's
 	// closed and reopened (or otherwise refreshed).
-	syncNote := widget.NewLabel("Note: new items here will show up in Daybook's Upcoming section next time it's opened.")
+	syncNote := widget.NewLabel("Note: new items here will show up in Daybook's Planned section next time it's opened.")
 	syncNote.Wrapping = fyne.TextWrapWord
 
 	content := container.NewVBox(
@@ -144,6 +167,7 @@ func showSODWindow(a fyne.App) {
 		streakLabel(),
 		listScroll,
 		copyBtn,
+		recurringBox,
 		entryRow,
 		syncNote,
 		widget.NewButton("Done", func() { w.Close() }),

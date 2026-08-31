@@ -1,8 +1,8 @@
-# Dunzo: Recurring TODOs/GOALs -- Design Seed (for next session)
+# Dunzo: Recurring TODOs/GOALs -- Design Seed
 
-Status: **not started, design-only**. Captured at end of the
-2026-08-31/09-01 session so a new session can pick this up fresh
-without re-deriving the thinking below.
+Status: **implemented (v1)**. Decisions below were made and acted on
+in the follow-up session; see "Implementation notes" for what
+actually landed.
 
 ## Problem
 
@@ -14,76 +14,58 @@ monthly) without having to re-type it from scratch each time, and
 without it silently getting forgotten if they don't think to log it
 that day.
 
-## Design thinking captured this session
+## Decisions made (resolving the four open questions below)
 
-- **Expected scale is small.** Micah's own framing: "probably only a
-  couple daily/weekly/monthly repeating" items -- this is NOT meant to
-  become a general-purpose recurring-task engine. Design for a short,
-  hand-maintained list (single digits per cadence), not hundreds.
-- **The core value is the reminder, not the tracking.** These are
-  "things that can be forgotten if not reminded" -- so the design
-  should prioritize surfacing them at the right moment (SOD for daily,
-  SOM for monthly, and presumably some weekly equivalent -- note:
-  there isn't yet a "Start of Week" nudge/window at all; may need one,
-  or piggyback on existing SOD/weekly-digest timing) over building rich
-  recurrence-editing UI.
-- **Relationship to existing recurring-meeting mini-calendar
-  (FR-15/`minicalendar.go`)**: that system already has day-of-week +
-  time-of-day config plumbing (`RecurringMeeting` struct,
-  `nextOccurrence`/`lastOccurrence`/`dueForPreMeetingNudge` helpers in
-  `minicalendar.go`) for *meetings* specifically. A recurring-
-  TODO/GOAL system is conceptually adjacent (also config-driven,
-  also "seed something into the ledger on a schedule") but almost
-  certainly needs a *simpler* recurrence model (daily / weekly-on-day-
-  X / monthly-on-day-Y, no time-of-day precision needed since these
-  aren't meetings) -- worth deciding whether to reuse/extend
-  `RecurringMeeting`-style config plumbing or build a distinct,
-  simpler `RecurringItem` type. Leaning toward a distinct simpler type
-  given the "just a couple, don't overbuild" framing.
-- **SOM's relationship to this feature -- explicitly deferred this
-  session**: the original ask was "seed SOM with monthly recurring
-  items, so it becomes a month checklist," but Micah said "wait on
-  just this item, actually" -- i.e. build the recurring-items feature
-  itself first (as its own thing), then revisit whether/how SOM should
-  auto-seed from it, rather than backing into the feature via SOM's
-  UI. Don't assume SOM-seeding is definitely still wanted in its
-  original form once the real feature exists -- ask again once it's
-  built.
-- **Likely touch points once designed:**
-  - `config.go` -- new config section, e.g. `[[recurring_item]]`
-    array-of-tables (category: TODO/GOAL, text, cadence: daily/
-    weekly/monthly, day-of-week or day-of-month as applicable).
-  - `sched.go` -- a new job (or extend SOD's existing daily job) that
-    checks recurring items due "today" and seeds them into today's
-    ledger (or surfaces them for one-tap confirm/add, TBD -- auto-
-    seeding is simpler but risks duplicate-looking ledger noise if the
-    user already logged the same thing manually that day; may want a
-    dedup check similar to FR-01's "already logged recently" idea, or
-    simply key off whether an identical open TODO/GOAL with that exact
-    text already exists today).
-  - `sod.go`/`som.go` -- likely surfaced/reviewable here once seeded
-    (not necessarily a new window of their own).
-  - Settings or a new small management window -- some way to
-    add/edit/remove recurring items without hand-editing
-    `config.toml` (though for "just a couple," hand-editing
-    config.toml directly might be an acceptable v1, deferring a GUI
-    editor -- worth asking Micah rather than assuming).
-- **Open questions to resolve at start of next session:**
-  1. Auto-seed into the ledger automatically each due day, vs. surface
-     as a suggestion the user explicitly confirms/adds (affects
-     append-only ledger cleanliness and dedup complexity)?
-  2. Does this need its own GUI (add/edit/remove), or is hand-editing
-     `config.toml` acceptable for v1 given the expected small scale?
-  3. Is a "Start of Week" concept needed for the weekly cadence, or
-     does weekly-recurring just piggyback on the existing daily SOD
-     nudge (checking "is today the configured day-of-week for this
-     item")?
-  4. Revisit the original "seed SOM as a month checklist" idea once
-     the base feature exists -- still wanted, and if so in what shape?
+1. **Surface as suggestion**, not auto-seed. Each due item shows up
+   with an explicit "Add" button; nothing is written to the ledger
+   until the user taps it.
+2. **Management GUI** -- a `showRecurringItemsDialog` (add/edit/
+   delete), reachable from Settings, not hand-edit-`config.toml`-only.
+3. **Weekly piggybacks on the existing daily SOD nudge** -- no new
+   "Start of Week" concept was built; SOD's cadence check just also
+   asks "is today the configured day-of-week for this weekly item."
+4. **SOM-seeding done now, not deferred further** -- SOM's wizard
+   gained a 5th step surfacing monthly recurring items as suggested
+   Adds, functioning as the "month checklist" originally asked for.
 
-## Explicitly NOT decided yet
+## Implementation notes
 
-No code has been written for this feature. No `RecurringItem` type,
-config key, or scheduling logic exists yet as of this doc. Next
-session should start with these open questions, get quick answers,
-then design + implement.
+- New file `dunnit/recurring.go`:
+  - `RecurringItem` struct (`Category`, `Text`, `Cadence` one of
+    daily/weekly/monthly, `DOW`, `DayOfMonth`) -- deliberately
+    simpler than `RecurringMeeting` (no time-of-day).
+  - `isDueToday`, `clampDayOfMonth` (31 clamps to e.g. 28/30 in
+    shorter months), `alreadyLoggedToday` (dedup against today's open
+    items by exact category+text match), `dueRecurringItems(cfg, now,
+    cadence)` (cadence="" matches any).
+  - `recurringItemsSuggestionBox` -- shared "Add" row builder used by
+    both SOD and SOM.
+  - `showRecurringItemsDialog` -- the management GUI, modeled on
+    `showMiniCalendarDialog`.
+- `config.go`: added `Config.RecurringItems []RecurringItem` (`toml:
+  "recurring_item"` array-of-tables).
+- `sod.go`: shows due daily+weekly items as suggestions above the
+  entry row; adding one refreshes both the open-items list and the
+  recurring suggestion box.
+- `som.go`: new "5. Monthly Recurring Items" step showing due monthly
+  items as suggestions.
+- `settings.go`: added a "Recurring Items..." button opening the
+  management dialog, alongside the existing "Recurring Meetings...".
+
+Verified via `make build` (clean) and `make vet` (clean); no
+automated tests in this repo yet, so manual click-through in the app
+is still needed to confirm the SOD/SOM suggestion flow and the
+management dialog's add/edit/delete behavior end-to-end.
+
+## Not yet done / possible follow-ups
+
+- No manual click-through testing performed yet (per repo convention,
+  that's on the human).
+- Editing an existing recurring item isn't supported by the GUI --
+  only add/delete. Edit-in-place could be added if it turns out to be
+  needed (currently: delete + re-add).
+- No dedup/interaction consideration for a recurring item whose text
+  happens to collide with a manually-logged item that isn't an exact
+  string match (e.g. slightly reworded) -- `alreadyLoggedToday` only
+  catches exact matches, by design (kept simple per "just a couple,
+  don't overbuild" framing).

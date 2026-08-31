@@ -18,7 +18,7 @@ type hoverButton struct {
 	widget.Button
 	tooltip string
 
-	popup      *widget.PopUp
+	popup      *tooltipPopup
 	hoverTimer *time.Timer
 }
 
@@ -35,6 +35,39 @@ func newHoverButton(label, tooltip string, tapped func()) *hoverButton {
 
 const hoverButtonTooltipDelay = 400 * time.Millisecond
 
+// tooltipPopup wraps widget.PopUp to fix a real click-swallowing bug:
+// Fyne's desktop driver only hit-tests against the topmost canvas
+// overlay when one exists (see internal/driver/glfw/window.go's
+// findObjectAtPositionMatching, which passes canvas.Overlays().Top()
+// and does *not* fall through to the window's normal content when an
+// overlay is present). Once this tooltip is shown (after hovering the
+// owning button for hoverButtonTooltipDelay), any click -- including
+// one landing squarely on the button itself -- gets routed to this
+// popup instead of the button underneath. widget.PopUp's own Tapped
+// just hides itself if the click was outside its own small content
+// area, silently eating the click that was actually meant for the
+// button (this is the root cause of Done/Postpone/Discard sometimes
+// doing nothing: it only reproduces once the tooltip has had time to
+// appear before the click). Fix: track the owning button's absolute
+// bounds, and if a dismissing click falls within them, forward it to
+// the button's own tap handler instead of just swallowing it.
+type tooltipPopup struct {
+	*widget.PopUp
+	ownerPos    fyne.Position
+	ownerSize   fyne.Size
+	ownerTapped func()
+}
+
+func (t *tooltipPopup) Tapped(e *fyne.PointEvent) {
+	within := e.AbsolutePosition.X >= t.ownerPos.X && e.AbsolutePosition.Y >= t.ownerPos.Y &&
+		e.AbsolutePosition.X <= t.ownerPos.X+t.ownerSize.Width &&
+		e.AbsolutePosition.Y <= t.ownerPos.Y+t.ownerSize.Height
+	t.PopUp.Tapped(e) // still lets PopUp's own outside-click-dismiss logic run/hide as normal
+	if within && t.ownerTapped != nil {
+		t.ownerTapped()
+	}
+}
+
 func (b *hoverButton) showTooltip() {
 	if b.popup != nil {
 		return
@@ -44,9 +77,15 @@ func (b *hoverButton) showTooltip() {
 		return
 	}
 	label := widget.NewLabel(b.tooltip)
-	b.popup = widget.NewPopUp(label, canvas)
+	pop := &tooltipPopup{
+		PopUp:       widget.NewPopUp(label, canvas),
+		ownerPos:    fyne.CurrentApp().Driver().AbsolutePositionForObject(b),
+		ownerSize:   b.Size(),
+		ownerTapped: b.OnTapped,
+	}
+	b.popup = pop
 	pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(b)
-	b.popup.ShowAtPosition(pos.Add(fyne.NewPos(0, b.Size().Height)))
+	pop.ShowAtPosition(pos.Add(fyne.NewPos(0, b.Size().Height)))
 }
 
 func (b *hoverButton) hideTooltip() {

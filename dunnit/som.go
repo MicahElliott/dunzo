@@ -144,6 +144,17 @@ func showSOMWindow(a fyne.App) {
 	newGoalsEntry.SetPlaceHolder("New/updated GOALs for this month? One per line...")
 	newGoalsEntry.SetMinRowsVisible(2)
 
+	// Step 5: monthly recurring items, surfaced as a month checklist
+	// (see RECURRING-ITEMS-DESIGN-SEED.md) -- each due monthly item is
+	// a suggestion the user explicitly taps "Add" for, not auto-seeded.
+	recurringBox := container.NewVBox()
+	dueMonthly := dueRecurringItems(LoadConfig(), now, "monthly")
+	if box := recurringItemsSuggestionBox(dueMonthly, nil); box != nil {
+		recurringBox.Add(box)
+	} else {
+		recurringBox.Add(widget.NewLabel("(no monthly recurring items due)"))
+	}
+
 	finishBtn := widget.NewButton("Commence "+now.Month().String(), func() {
 		for _, line := range strings.Split(impactEntry.Text, "\n") {
 			line = strings.TrimSpace(line)
@@ -177,6 +188,8 @@ func showSOMWindow(a fyne.App) {
 		widget.NewLabelWithStyle("4. This Month's GOALs", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		currentGoalsBox,
 		newGoalsEntry,
+		widget.NewLabelWithStyle("5. Monthly Recurring Items", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		recurringBox,
 		finishBtn,
 	)
 

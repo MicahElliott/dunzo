@@ -92,6 +92,7 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 			fyne.Do(func() {
 				w.Show()
 				w.RequestFocus()
+				FocusMainInput()
 			})
 		}),
 	)
@@ -111,6 +112,7 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 				fyne.Do(func() {
 					w.Show()
 					w.RequestFocus()
+					FocusMainInput()
 				})
 			}),
 		)

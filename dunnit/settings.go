@@ -93,7 +93,11 @@ func showSettings(a fyne.App) {
 		showMiniCalendarDialog(a, w)
 	})
 
-	w.SetContent(container.NewVBox(form, recurringMeetingsBtn))
+	recurringItemsBtn := widget.NewButton("Recurring Items...", func() {
+		showRecurringItemsDialog(a, w)
+	})
+
+	w.SetContent(container.NewVBox(form, recurringMeetingsBtn, recurringItemsBtn))
 	w.Resize(fyne.NewSize(320, 340))
 	w.Show()
 }
