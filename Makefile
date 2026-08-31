@@ -40,6 +40,10 @@ release:
 	$(MAKE) package
 	rm -f Dunzo-$(VERSION)-macos.zip
 	ditto -c -k --sequesterRsrc --keepParent Dunzo.app Dunzo-$(VERSION)-macos.zip
+	@# `fyne package` bumps FyneApp.toml's internal Build counter as a
+	@# side effect -- discard that so tagging happens on a clean tree
+	@# matching what was already committed.
+	git checkout -- FyneApp.toml
 	git tag $(VERSION)
-	git push origin $(VERSION)
-	gh release create $(VERSION) Dunzo-$(VERSION)-macos.zip --title "$(VERSION)" --generate-notes
+	env -u GH_TOKEN git push origin $(VERSION)
+	env -u GH_TOKEN gh release create $(VERSION) Dunzo-$(VERSION)-macos.zip --title "$(VERSION)" --generate-notes
