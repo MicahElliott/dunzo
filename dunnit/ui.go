@@ -287,14 +287,6 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// label2 := widget.NewLabel("Label 2")
 	// value2 := widget.NewLabel("Something")
 
-	// lastDunnitLabel uses markdown bold on the "Last Dunnit:" prefix
-	// to visually separate it from the actual recorded text.
-	// refreshLastDunnit keeps all call sites in sync with that format.
-	lastDunnitLabel := widget.NewRichTextFromMarkdown("**Last Dunnit:** " + getLastDunnit())
-	refreshLastDunnit := func() {
-		lastDunnitLabel.ParseMarkdown("**Last Dunnit:** " + getLastDunnit())
-	}
-
 	// TODO show day's GOALs
 
 	input := newCloseShortcutEntry(fyne.KeyW, fyne.KeyModifierShortcutDefault, func() { w4.Hide() })
@@ -449,19 +441,16 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		addRow := func(item OpenItem) {
 			row := container.NewBorder(nil, nil, nil,
 				container.NewHBox(
-					widget.NewButton("🐌 Postpone", func() {
-						recordPostponed(item)
-						refreshLastDunnit()
-						refreshOpenItems()
-					}),
-					widget.NewButton("❌ Nah", func() {
+					newHoverButton("❌", "Discard", func() {
 						recordDiscarded(item)
-						refreshLastDunnit()
 						refreshOpenItems()
 					}),
-					widget.NewButton("✔️ Done", func() {
+					newHoverButton("🐌", "Postpone", func() {
+						recordPostponed(item)
+						refreshOpenItems()
+					}),
+					newHoverButton("✔️", "Done", func() {
 						recordConvertedDone(item)
-						refreshLastDunnit()
 						refreshOpenItems()
 						refreshCompleted()
 					}),
@@ -516,7 +505,6 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		recordActivity(withMins(input.Text), selectedCat) // TODO trim emoji off front, and shorten to 4-char code
 		input.SetText("")
 		minsInput.SetText("")
-		refreshLastDunnit()
 		refreshOpenItems()
 		refreshCompleted()
 	}
@@ -534,7 +522,6 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			if txt := lastEntryText(); txt != "" {
 				recordActivity(withMins(txt), "ONGOING")
 				minsInput.SetText("")
-				refreshLastDunnit()
 				refreshOpenItems()
 			}
 		}),
@@ -561,7 +548,6 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		commonTagsRow,
 		buttons,
 		widget.NewSeparator(),
-		lastDunnitLabel,
 		itemsAccordion,
 	)
 	log.Println(content)
@@ -612,7 +598,6 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			}),
 			fyne.NewMenuItem("Undo/Edit Last Entry...", func() {
 				showUndoEditLastEntry(a, func() {
-					refreshLastDunnit()
 					refreshOpenItems()
 					refreshCompleted()
 				})
@@ -687,13 +672,6 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	w4.Show()
 
 	return w4
-}
-
-func getLastDunnit() string {
-	if txt := lastEntryText(); txt != "" {
-		return txt
-	}
-	return "(nothing recorded yet today)"
 }
 
 func updateTime(clock *widget.Label) {

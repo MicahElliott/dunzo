@@ -144,7 +144,7 @@ func showSOMWindow(a fyne.App) {
 	newGoalsEntry.SetPlaceHolder("New/updated GOALs for this month? One per line...")
 	newGoalsEntry.SetMinRowsVisible(2)
 
-	finishBtn := widget.NewButton("Finish SOM", func() {
+	finishBtn := widget.NewButton("Commence "+now.Month().String(), func() {
 		for _, line := range strings.Split(impactEntry.Text, "\n") {
 			line = strings.TrimSpace(line)
 			if line != "" {

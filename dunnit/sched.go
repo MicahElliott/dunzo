@@ -16,6 +16,23 @@ func parseHM(s string) (hour, minute int) {
 	return
 }
 
+// isFirstWeekdayOfMonth reports whether the given date is the first
+// weekday (Mon-Fri) of its month -- i.e. day 1, or day 2/3 if day 1
+// falls on a weekend. Used to auto-pop the SOM wizard on the actual
+// first working day of the month, rather than requiring day 1 itself
+// to be a weekday (which would otherwise silently skip SOM entirely
+// for any month starting on a Sat/Sun).
+func isFirstWeekdayOfMonth(now time.Time) bool {
+	if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
+		return false
+	}
+	first := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	for first.Weekday() == time.Saturday || first.Weekday() == time.Sunday {
+		first = first.AddDate(0, 0, 1)
+	}
+	return now.Day() == first.Day()
+}
+
 // withinWorkHours reports whether now falls between the configured
 // day_start and day_end (inclusive), Mon-Fri only.
 func withinWorkHours(cfg Config, now time.Time) bool {
@@ -105,9 +122,13 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 	// FR-13: Start-of-Day nudge, fires once per workday near
 	// cfg.DayStart, showing today's open TODOs/GOALs (readback) and a
 	// chance to add more before the day gets going. FR-14: if today
-	// is also the 1st of the month, show the SOM wizard instead (its
-	// step 4 already covers the same "current GOALs" readback SOD
-	// would show, so no need for both).
+	// is also the first weekday of the month, show the SOM wizard
+	// instead (its step 4 already covers the same "current GOALs"
+	// readback SOD would show, so no need for both). Uses
+	// isFirstWeekdayOfMonth rather than a plain "day == 1" check so
+	// SOM still fires on the actual first working day even when the
+	// 1st falls on a weekend (otherwise SOM would silently never fire
+	// that month).
 	if sh, sm := parseHM(cfg.DayStart); sh != 0 || sm != 0 {
 		_, err = s.NewJob(
 			gocron.DailyJob(1, gocron.NewAtTimes(gocron.NewAtTime(uint(sh), uint(sm), 0))),
@@ -116,7 +137,7 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 				if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
 					return
 				}
-				if now.Day() == 1 {
+				if isFirstWeekdayOfMonth(now) {
 					a.SendNotification(fyne.NewNotification(
 						"Dunzo", "Start of a new month!"))
 					fyne.Do(func() {
