@@ -32,10 +32,14 @@ func isOpenTrackedCategory(cat string) bool {
 // "resolved" into from the Upcoming list, and what button triggers
 // each: DONE via the "Done" button (actually completed), SOMEDAY via
 // the "Postpone" button (deliberately deferred rather than pretending
-// it's done -- see FR-07 follow-up). Both leave the original line
-// untouched (append-only ledger design) and are recognized by
-// parseOpenItems as removing the item from the open/Upcoming list.
-var resolvingCategories = []string{"DONE", "SOMEDAY"}
+// it's done -- see FR-07 follow-up), DISCARDED via the "Nah" button
+// (deliberately dropped, not done and not deferred -- just no longer
+// relevant). All three leave the original line untouched (append-only
+// ledger design) and are recognized by parseOpenItems as removing the
+// item from the open/Upcoming list. DISCARDED isn't a selectable
+// Daybook category (see categories.go) -- it only ever gets written
+// via recordDiscarded, never picked by hand.
+var resolvingCategories = []string{"DONE", "SOMEDAY", "DISCARDED"}
 
 // convertedSuffix marks a resolving line (DONE or SOMEDAY) as having
 // been generated from an open item, so parseOpenItems can recognize
@@ -118,6 +122,15 @@ func recordConvertedDone(item OpenItem) {
 // list doesn't grow unbounded. The original line is left untouched.
 func recordPostponed(item OpenItem) {
 	recordActivity(item.Text+convertedSuffix(item.Category), "SOMEDAY")
+}
+
+// recordDiscarded logs a DISCARDED entry referencing an original open
+// item's text, marking it as resolved via outright dismissal (the
+// "Nah" button) -- distinct from Postpone (SOMEDAY, meant to revisit
+// later) since a discarded item isn't expected to come back. The
+// original line is left untouched.
+func recordDiscarded(item OpenItem) {
+	recordActivity(item.Text+convertedSuffix(item.Category), "DISCARDED")
 }
 
 // groupOpenItemsByCategory buckets items by category, preserving

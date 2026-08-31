@@ -104,6 +104,13 @@ func showEODWindow(a fyne.App) {
 	todayBody.Wrapping = fyne.TextWrapWord
 	todayBody.SetMinRowsVisible(10)
 	todayBody.Disable() // read-only display
+	// Wrapped in a Scroll for the form (so a long day doesn't blow up
+	// the whole window), but Scroll doesn't inherit its child's
+	// MinSize by default -- without an explicit SetMinSize here, it
+	// renders at whatever tiny default the form layout gives it,
+	// ignoring todayBody's own SetMinRowsVisible(10) above.
+	todayScroll := container.NewVScroll(todayBody)
+	todayScroll.SetMinSize(fyne.NewSize(0, 220)) // room for ~8+ lines
 
 	// AI-drafted summary: fed today's ledger text via the same
 	// summarizeWithCopilot pipeline used elsewhere (Summarize/SOM),
@@ -151,7 +158,7 @@ func showEODWindow(a fyne.App) {
 	questionBox, openQuestions, questionChecks := eodOpenItemsSection("QUESTION")
 
 	items := []*widget.FormItem{
-		widget.NewFormItem("Today's Items", container.NewVScroll(todayBody)),
+		widget.NewFormItem("Today's Items", todayScroll),
 		widget.NewFormItem("Summary", summary),
 		widget.NewFormItem("Productivity (1-5)", productivity),
 		widget.NewFormItem("Meeting Hours", meetingHours),

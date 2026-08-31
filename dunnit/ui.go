@@ -447,23 +447,26 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			return
 		}
 		addRow := func(item OpenItem) {
-			catLabel := canvas.NewText(item.Category, theme.Color(theme.ColorNameForeground))
-			catLabel.TextStyle = fyne.TextStyle{Monospace: true}
-			row := container.NewBorder(nil, nil, catLabel,
+			row := container.NewBorder(nil, nil, nil,
 				container.NewHBox(
-					widget.NewButton("Postpone", func() {
+					widget.NewButton("🐌 Postpone", func() {
 						recordPostponed(item)
 						refreshLastDunnit()
 						refreshOpenItems()
 					}),
-					widget.NewButton("Done", func() {
+					widget.NewButton("❌ Nah", func() {
+						recordDiscarded(item)
+						refreshLastDunnit()
+						refreshOpenItems()
+					}),
+					widget.NewButton("✔️ Done", func() {
 						recordConvertedDone(item)
 						refreshLastDunnit()
 						refreshOpenItems()
 						refreshCompleted()
 					}),
 				),
-				widget.NewLabel(item.Text))
+				widget.NewLabel("- "+item.Text))
 			openItemsBox.Add(row)
 		}
 		cats, grouped := groupOpenItemsByCategory(items)
@@ -543,17 +546,16 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	)
 
 	// showAllTagsBtn opens a standalone window listing every known
-	// tag (KnownTags(), full ledger-history scan) -- "Common tags:"
+	// tag (KnownTags(), full ledger-history scan) -- "Frecent tags:"
 	// only shows the top few by commonAndRecentTags's blended
-	// score, this is the escape hatch to see everything. (Editing/
-	// deleting tags across history is a possible future extension,
-	// not implemented here -- see tags.go.)
+	// frequency+recency score, this is the escape hatch to see
+	// everything. (Editing/deleting tags across history is a possible
+	// future extension, not implemented here -- see tags.go.)
 	commonTagsRow := container.NewBorder(nil, nil, nil,
 		widget.NewButton("Show all", func() { showAllTagsWindow(a) }),
-		widget.NewLabel("Common tags: "+strings.Join(commonAndRecentTags(8), " ")))
+		widget.NewLabel("Frecent tags: "+strings.Join(commonAndRecentTags(8), " ")))
 
 	content := container.NewVBox(
-		widget.NewLabel("What would you like to record?"),
 		doneWrapper,
 		// category, input,
 		commonTagsRow,
