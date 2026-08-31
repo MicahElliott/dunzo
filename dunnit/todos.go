@@ -179,3 +179,64 @@ func getCompletedItems() []string {
 	}
 	return out
 }
+
+// categoryGroupOrder returns the category codes belonging to group
+// ("now"/"plan"/"reflect"), in Categories' declared order -- the
+// canonical per-group ordering used to keep Daybook's Completed/
+// Planned/Reflections sub-headings consistent with categories.go
+// rather than each section re-deriving its own order.
+func categoryGroupOrder(group string) []string {
+	var codes []string
+	for _, c := range Categories {
+		if c.Group == group {
+			codes = append(codes, c.Code)
+		}
+	}
+	return codes
+}
+
+// getCategoryGroupItems returns today's entries whose category
+// belongs to group ("now"/"reflect"), in first-seen order. Used by
+// Daybook's Completed ("now") and Reflections ("reflect") sections --
+// the general-purpose sibling of getOpenItems, which is specific to
+// openTrackedCategories ("plan"). Strips the "(via CATEGORY)" suffix
+// (see convertedSuffix) from DONE entries converted from an open
+// item, same as getCompletedItems did -- harmless no-op for any other
+// category, which never carries that suffix.
+func getCategoryGroupItems(group string) []OpenItem {
+	codes := make(map[string]bool)
+	for _, c := range categoryGroupOrder(group) {
+		codes[c] = true
+	}
+	var out []OpenItem
+	for _, line := range readLedgerLines() {
+		cat, text, ok := parseLedgerLine(line)
+		if !ok || !codes[cat] {
+			continue
+		}
+		for _, srcCat := range openTrackedCategories {
+			text = strings.TrimSuffix(text, convertedSuffix(srcCat))
+		}
+		out = append(out, OpenItem{Category: cat, Text: text})
+	}
+	return out
+}
+
+// groupCategoryItemsByGroup buckets items (as returned by
+// getCategoryGroupItems) by category, preserving group's
+// categoryGroupOrder and skipping empty buckets -- the general-
+// purpose sibling of groupOpenItemsByCategory, letting Completed and
+// Reflections show per-category sub-headings the same way Planned
+// already does.
+func groupCategoryItemsByGroup(group string, items []OpenItem) (categories []string, grouped map[string][]OpenItem) {
+	grouped = make(map[string][]OpenItem)
+	for _, item := range items {
+		grouped[item.Category] = append(grouped[item.Category], item)
+	}
+	for _, cat := range categoryGroupOrder(group) {
+		if len(grouped[cat]) > 0 {
+			categories = append(categories, cat)
+		}
+	}
+	return categories, grouped
+}

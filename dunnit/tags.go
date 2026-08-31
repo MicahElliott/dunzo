@@ -236,6 +236,25 @@ func commonAndRecentTags(limit int) []string {
 	return out
 }
 
+// commonAndRecentTagsWithCounts is the same ranking/filtering as
+// commonAndRecentTags, but returns the raw tag and its count
+// separately (rather than a single pre-formatted string) -- used by
+// ui.go's clickable "Frecent tags:" row, which needs the bare tag
+// (e.g. "#boss") to insert into the entry box on click, plus the
+// count to still display alongside it.
+func commonAndRecentTagsWithCounts(limit int) (tags []string, counts []int) {
+	stats := filterNumericTags(gatherTagStats())
+	ranked := rankTagsByScore(stats)
+	if len(ranked) > limit {
+		ranked = ranked[:limit]
+	}
+	counts = make([]int, len(ranked))
+	for i, tag := range ranked {
+		counts[i] = stats[tag].count
+	}
+	return ranked, counts
+}
+
 // matchingTags returns tags from candidates that contain fragment as
 // a case-insensitive substring, with prefix matches (fragment matches
 // right after the tag's "#") sorted first, then other substring
