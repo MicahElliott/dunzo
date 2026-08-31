@@ -499,11 +499,12 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 	// Upcoming/Completed are both collapsible (via widget.Accordion)
 	// so either can be tucked out of the way once reviewed, freeing
-	// room for the other.
+	// room for the other. Completed listed first (with Upcoming below
+	// it) per Micah's preferred ordering.
 	upcomingItem := widget.NewAccordionItem("Upcoming", openItemsBox)
-	upcomingItem.Open = true
 	completedItem := widget.NewAccordionItem("Completed", completedBox)
-	itemsAccordion := widget.NewAccordion(upcomingItem, completedItem)
+	completedItem.Open = true
+	itemsAccordion := widget.NewAccordion(completedItem, upcomingItem)
 
 	saveEntry := func() {
 		if strings.TrimSpace(input.Text) == "" {
@@ -553,12 +554,12 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 	content := container.NewVBox(
 		widget.NewLabel("What would you like to record?"),
-		lastDunnitLabel,
 		doneWrapper,
 		// category, input,
 		commonTagsRow,
 		buttons,
 		widget.NewSeparator(),
+		lastDunnitLabel,
 		itemsAccordion,
 	)
 	log.Println(content)

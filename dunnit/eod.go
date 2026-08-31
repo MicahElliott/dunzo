@@ -55,30 +55,88 @@ func recordTomorrowGoals(lines []string) {
 	}
 }
 
-// carryForwardTodo appends a fresh TODO line (plain re-listing, no
-// state/history beyond what's already in today's ledger) to
-// tomorrow's ledger for an item the user chose not to convert/
-// postpone today (FR-09).
-func carryForwardTodo(text string) {
-	appendTomorrowLine("[05:00] TODO " + text)
+// carryForwardItem appends a fresh line of the given category (plain
+// re-listing, no state/history beyond what's already in today's
+// ledger) to tomorrow's ledger for an item the user chose not to
+// convert/postpone today (FR-09, extended beyond just TODO to also
+// cover QUESTION carry-forward).
+func carryForwardItem(category, text string) {
+	appendTomorrowLine("[05:00] " + category + " " + text)
+}
+
+// eodOpenItemsSection builds one carry-forward-checkbox section (used
+// for both TODO and QUESTION) of showEODWindow: a checkbox per still-
+// open item of the given category, checked by default, so the user
+// can carry it forward into tomorrow's ledger -- or uncheck to leave
+// it behind on purpose (not forced).
+func eodOpenItemsSection(category string) (box *fyne.Container, items []OpenItem, checks []*widget.Check) {
+	for _, item := range getOpenItems() {
+		if item.Category == category {
+			items = append(items, item)
+		}
+	}
+	box = container.NewVBox()
+	checks = make([]*widget.Check, len(items))
+	for i, item := range items {
+		c := widget.NewCheck(item.Text, nil)
+		c.SetChecked(true)
+		checks[i] = c
+		box.Add(c)
+	}
+	return box, items, checks
 }
 
 // showEODWindow recreates (in spirit) dunnit.zsh's dunnit-eod sequence:
-// a short daily wrap-up capturing a summary, a productivity score, a
-// sentiment rating, goals for tomorrow, and (FR-09) a chance to carry
-// forward any TODOs not converted/postponed today. Rather than a
-// chain of separate popups (as the original zsh alerter-based flow
-// did), this is one window with all the questions -- simpler to
-// implement and to answer.
+// a short daily wrap-up showing everything logged today, an AI-drafted
+// summary (editable before saving), a productivity score, a meeting-
+// hours count, a sentiment rating, goals for tomorrow, and (FR-09,
+// extended) a chance to carry forward any TODOs/QUESTIONs not
+// resolved today. Rather than a chain of separate popups (as the
+// original zsh alerter-based flow did), this is one window with all
+// the questions -- simpler to implement and to answer.
 func showEODWindow(a fyne.App) {
 	w := a.NewWindow("Dunzo: End of Day")
 
+	// Today's items, shown first -- read-only, so the user has the
+	// full day in view before answering anything below.
+	todayBody := widget.NewMultiLineEntry()
+	todayBody.SetText(strings.Join(readLedgerLines(), "\n"))
+	todayBody.Wrapping = fyne.TextWrapWord
+	todayBody.SetMinRowsVisible(10)
+	todayBody.Disable() // read-only display
+
+	// AI-drafted summary: fed today's ledger text via the same
+	// summarizeWithCopilot pipeline used elsewhere (Summarize/SOM),
+	// rather than asking the user to hand-write one. Runs in the
+	// background since it shells out to gh copilot; the field starts
+	// with a placeholder and is editable once (or before) the draft
+	// arrives, so the user can always tweak/replace it before Finalize
+	// Day.
 	summary := widget.NewMultiLineEntry()
-	summary.SetPlaceHolder("Summarize your day in a couple sentences...")
-	summary.SetMinRowsVisible(3)
+	summary.SetPlaceHolder("Generating an AI summary of today, please wait (feel free to edit once it arrives, or type your own now)...")
+	summary.SetMinRowsVisible(5)
+	go func() {
+		ledgerText := gatherLedgerTextForDate(time.Now())
+		if strings.TrimSpace(ledgerText) == "" {
+			return
+		}
+		draft, err := summarizeWithCopilot(ledgerText)
+		fyne.Do(func() {
+			if err != nil {
+				log.Println("Error drafting EOD summary:", err)
+				return
+			}
+			if strings.TrimSpace(summary.Text) == "" {
+				summary.SetText(draft)
+			}
+		})
+	}()
 
 	productivity := widget.NewSelect([]string{"1", "2", "3", "4", "5"}, nil)
 	productivity.SetSelected("3")
+
+	meetingHours := widget.NewEntry()
+	meetingHours.SetPlaceHolder("e.g. 2.5")
 
 	sentiment := widget.NewSelect([]string{"Negative", "Neutral", "Positive"}, nil)
 	sentiment.SetSelected("Neutral")
@@ -87,33 +145,24 @@ func showEODWindow(a fyne.App) {
 	goals.SetPlaceHolder("Any goals for tomorrow? One per line...")
 	goals.SetMinRowsVisible(3)
 
-	// FR-09: any TODOs still open (not converted to DONE or postponed
-	// to SOMEDAY) get a checkbox, checked by default, so the user can
-	// carry them forward into tomorrow's ledger -- or uncheck to
-	// leave one behind on purpose (not forced).
-	var openTodos []OpenItem
-	for _, item := range getOpenItems() {
-		if item.Category == "TODO" {
-			openTodos = append(openTodos, item)
-		}
-	}
-	carryForwardBox := container.NewVBox()
-	checks := make([]*widget.Check, len(openTodos))
-	for i, item := range openTodos {
-		c := widget.NewCheck(item.Text, nil)
-		c.SetChecked(true)
-		checks[i] = c
-		carryForwardBox.Add(c)
-	}
+	// FR-09 (extended): open TODOs and QUESTIONs each get their own
+	// carry-forward checkbox section.
+	todoBox, openTodos, todoChecks := eodOpenItemsSection("TODO")
+	questionBox, openQuestions, questionChecks := eodOpenItemsSection("QUESTION")
 
 	items := []*widget.FormItem{
+		widget.NewFormItem("Today's Items", container.NewVScroll(todayBody)),
 		widget.NewFormItem("Summary", summary),
 		widget.NewFormItem("Productivity (1-5)", productivity),
+		widget.NewFormItem("Meeting Hours", meetingHours),
 		widget.NewFormItem("Sentiment", sentiment),
 		widget.NewFormItem("Tomorrow's Goals", goals),
 	}
 	if len(openTodos) > 0 {
-		items = append(items, widget.NewFormItem("Carry Forward Open TODOs", carryForwardBox))
+		items = append(items, widget.NewFormItem("Carry Forward Open TODOs", todoBox))
+	}
+	if len(openQuestions) > 0 {
+		items = append(items, widget.NewFormItem("Carry Forward Open QUESTIONs", questionBox))
 	}
 	form := widget.NewForm(items...)
 	form.SubmitText = "Finalize Day"
@@ -122,14 +171,22 @@ func showEODWindow(a fyne.App) {
 			recordActivity(summary.Text, "SUMMARY")
 		}
 		recordActivity(productivity.Selected, "PRODUCTIVITY")
+		if hrs := strings.TrimSpace(meetingHours.Text); hrs != "" {
+			recordActivity(hrs, "MEETING_HOURS")
+		}
 		recordActivity(sentiment.Selected, "SENTIMENT")
 
 		if strings.TrimSpace(goals.Text) != "" {
 			recordTomorrowGoals(strings.Split(goals.Text, "\n"))
 		}
 		for i, item := range openTodos {
-			if checks[i].Checked {
-				carryForwardTodo(item.Text)
+			if todoChecks[i].Checked {
+				carryForwardItem("TODO", item.Text)
+			}
+		}
+		for i, item := range openQuestions {
+			if questionChecks[i].Checked {
+				carryForwardItem("QUESTION", item.Text)
 			}
 		}
 		// FR-18: draft (if not already present) today's hand-editable
@@ -159,6 +216,6 @@ func showEODWindow(a fyne.App) {
 	}
 
 	w.SetContent(container.NewVScroll(form))
-	w.Resize(fyne.NewSize(420, 400))
+	w.Resize(fyne.NewSize(560, 820))
 	w.Show()
 }

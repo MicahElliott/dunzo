@@ -94,6 +94,7 @@ var Categories = []Category{
 	{"💼", "CAREER", "A big, resume/CV-worthy accomplishment or realization -- not a plan, a retrospective note that something huge happened.", "reflect", "positive"},
 	{"🔚", "SUMMARY", "A wrap-up/summary note (typically written via End of Day).", "reflect", ""},
 	{"📈", "PRODUCTIVITY", "A note on your own productivity/efficiency (typically written via End of Day).", "reflect", ""},
+	{"🕑", "MEETING_HOURS", "How many hours of meetings you were in today (typically written via End of Day).", "reflect", ""},
 	{"❌", "FAIL", "Something that didn't go as hoped.", "reflect", "negative"},
 	{"🗑️", "WASTED", "Time/effort that felt wasted.", "reflect", "negative"},
 }

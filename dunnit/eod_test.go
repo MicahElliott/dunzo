@@ -9,7 +9,7 @@ import (
 func TestCarryForwardTodo(t *testing.T) {
 	withTempDunzoDir(t)
 
-	carryForwardTodo("finish the report")
+	carryForwardItem("TODO", "finish the report")
 
 	_, fname := tomorrowLedgerPath()
 	data, err := os.ReadFile(fname)
