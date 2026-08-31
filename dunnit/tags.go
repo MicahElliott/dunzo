@@ -2,6 +2,7 @@ package dun
 
 import (
 	"bufio"
+	"fmt"
 	"math"
 	"os"
 	"regexp"
@@ -19,6 +20,19 @@ import (
 // word-ish characters (letters, digits, underscore, hyphen, colon --
 // covers things like "#pts:3").
 var tagPattern = regexp.MustCompile(`#[\w:-]+`)
+
+// numericTagPattern matches a tag that's strictly digits after the
+// "#" (e.g. "#12345") -- typically an accidental tag (a phone number,
+// ticket number, or similar pasted-in digits rather than an
+// intentional tag), so these are specifically filtered down to just
+// the single most recent one in tag-listing UI (see
+// filterNumericTags) rather than cluttering "Common tags:"/"Show all"
+// with every numeric one ever used.
+var numericTagPattern = regexp.MustCompile(`^#\d+$`)
+
+func isNumericTag(tag string) bool {
+	return numericTagPattern.MatchString(tag)
+}
 
 // extractTags returns all distinct #tag tokens found in text, in
 // first-seen order.
@@ -93,28 +107,30 @@ func scanAllTags() []string {
 	return tags
 }
 
-// tagRecencyHalfLife controls how fast a tag's contribution to
-// commonAndRecentTags's score decays with age. Each occurrence's
-// weight halves every tagRecencyHalfLife days, so tags stop showing
-// up in "common/recent" once they've been unused for a while, no
-// matter how many times they were used long ago.
+// tagRecencyHalfLife controls how fast a tag's contribution to a
+// frecency score decays with age. Each occurrence's weight halves
+// every tagRecencyHalfLife days, so tags stop showing up in "common/
+// recent" once they've been unused for a while, no matter how many
+// times they were used long ago.
 const tagRecencyHalfLife = 14.0
 
-// commonAndRecentTags returns up to limit tags from ledger history,
-// ranked by a blended score of frequency and recency -- leaning
-// somewhat more toward recent tags than pure frequency would, per
-// Micah's preference, rather than pure "most common of all time"
-// (which tends to entrench old tags and never surface newer ones).
-// Each occurrence of a tag contributes a weight that exponentially
-// decays with the age of that occurrence (half-life
-// tagRecencyHalfLife days) -- so a tag's score is dominated by its
-// recent usage, and heavy historical-but-stale usage fades away
-// rather than permanently outranking genuinely recent tags. (Bug fix
-// 2026-08-31: the previous version added an unbounded lifetime count
-// to a recency bonus capped at 14, so any tag used enough times ever
-// would permanently outrank newer tags regardless of staleness.)
-func commonAndRecentTags(limit int) []string {
-	scores := map[string]float64{}
+// tagStat holds a tag's usage count and frecency score (see
+// gatherTagStats), for display ("(count)") and ranking.
+type tagStat struct {
+	count    int
+	score    float64
+	lastSeen time.Time
+}
+
+// gatherTagStats scans all ledger history once and returns, per tag,
+// its total occurrence count and a frecency score -- each
+// occurrence's weight exponentially decays with the age of that
+// occurrence (half-life tagRecencyHalfLife days), so a tag's score is
+// dominated by recent usage rather than lifetime total (see git log
+// 2026-08-31 fix for why: an earlier version let heavy historical-
+// but-stale usage permanently outrank genuinely recent tags).
+func gatherTagStats() map[string]*tagStat {
+	stats := map[string]*tagStat{}
 	now := time.Now()
 	for _, path := range allLedgerFiles() {
 		date := ledgerFileDate(path)
@@ -133,32 +149,89 @@ func commonAndRecentTags(limit int) []string {
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
 			for _, tag := range extractTags(scanner.Text()) {
-				scores[tag] += weight
+				st := stats[tag]
+				if st == nil {
+					st = &tagStat{}
+					stats[tag] = st
+				}
+				st.count++
+				st.score += weight
+				if date.After(st.lastSeen) {
+					st.lastSeen = *date
+				}
 			}
 		}
 		f.Close()
 	}
+	return stats
+}
 
-	type scored struct {
-		tag   string
-		score float64
-	}
-	all := make([]scored, 0, len(scores))
-	for tag, score := range scores {
-		all = append(all, scored{tag: tag, score: score})
-	}
-	sort.Slice(all, func(i, j int) bool {
-		if all[i].score != all[j].score {
-			return all[i].score > all[j].score
+// filterNumericTags drops all-but-the-most-recently-used numeric tag
+// (e.g. "#12345") from a tag-stats map -- these are typically
+// accidental (pasted ticket/phone numbers etc, not intentional tags),
+// so only the single most recent one is worth surfacing in tag-
+// listing UI; older ones would just be clutter. Non-numeric tags are
+// untouched.
+func filterNumericTags(stats map[string]*tagStat) map[string]*tagStat {
+	var mostRecentNumeric string
+	var mostRecentSeen time.Time
+	for tag, st := range stats {
+		if !isNumericTag(tag) {
+			continue
 		}
-		return all[i].tag < all[j].tag // stable tiebreak
-	})
-	if len(all) > limit {
-		all = all[:limit]
+		if mostRecentNumeric == "" || st.lastSeen.After(mostRecentSeen) {
+			mostRecentNumeric = tag
+			mostRecentSeen = st.lastSeen
+		}
 	}
-	out := make([]string, len(all))
-	for i, s := range all {
-		out[i] = s.tag
+	out := make(map[string]*tagStat, len(stats))
+	for tag, st := range stats {
+		if isNumericTag(tag) && tag != mostRecentNumeric {
+			continue
+		}
+		out[tag] = st
+	}
+	return out
+}
+
+// rankTagsByScore returns tags from stats sorted by descending
+// frecency score (ties broken alphabetically for stability).
+func rankTagsByScore(stats map[string]*tagStat) []string {
+	tags := make([]string, 0, len(stats))
+	for tag := range stats {
+		tags = append(tags, tag)
+	}
+	sort.Slice(tags, func(i, j int) bool {
+		si, sj := stats[tags[i]].score, stats[tags[j]].score
+		if si != sj {
+			return si > sj
+		}
+		return tags[i] < tags[j]
+	})
+	return tags
+}
+
+// formatTagWithCount renders a tag with its usage count in
+// parentheses, e.g. "#boss (12)".
+func formatTagWithCount(tag string, st *tagStat) string {
+	return fmt.Sprintf("%s (%d)", tag, st.count)
+}
+
+// commonAndRecentTags returns up to limit tags from ledger history,
+// each formatted with its usage count (e.g. "#boss (12)"), ranked by
+// frecency (blended frequency + recency, see gatherTagStats) with
+// all-but-the-most-recent numeric tag (e.g. "#12345") filtered out
+// per Micah's preference -- those are typically accidental/pasted
+// digits, not intentional tags, and clutter this short list.
+func commonAndRecentTags(limit int) []string {
+	stats := filterNumericTags(gatherTagStats())
+	ranked := rankTagsByScore(stats)
+	if len(ranked) > limit {
+		ranked = ranked[:limit]
+	}
+	out := make([]string, len(ranked))
+	for i, tag := range ranked {
+		out[i] = formatTagWithCount(tag, stats[tag])
 	}
 	return out
 }
@@ -217,22 +290,23 @@ func isTagBreak(r rune) bool {
 }
 
 // showAllTagsWindow shows every distinct tag ever seen across ledger
-// history (KnownTags(), full scan) in a standalone scrollable window
-// -- the escape hatch from Daybook's "Common tags:" line, which only
-// shows a handful by blended frequency/recency score. Editing/
-// deleting a tag across all its historical occurrences is a possible
-// future extension (see tags.go's package doc) -- not implemented
-// here, this is read-only.
+// history in a standalone scrollable window -- the escape hatch from
+// Daybook's "Common tags:" line, which only shows a handful. Same
+// frecency ranking, usage count, and numeric-tag filtering as
+// commonAndRecentTags, just unlimited. Editing/deleting a tag across
+// all its historical occurrences is a possible future extension (see
+// tags.go's package doc) -- not implemented here, this is read-only.
 func showAllTagsWindow(a fyne.App) {
 	w := a.NewWindow("Dunzo: All Tags")
 
-	tags := KnownTags()
+	stats := filterNumericTags(gatherTagStats())
+	ranked := rankTagsByScore(stats)
 	list := container.NewVBox()
-	if len(tags) == 0 {
+	if len(ranked) == 0 {
 		list.Add(widget.NewLabel("No tags found in ledger history yet."))
 	}
-	for _, tag := range tags {
-		list.Add(widget.NewLabel(tag))
+	for _, tag := range ranked {
+		list.Add(widget.NewLabel(formatTagWithCount(tag, stats[tag])))
 	}
 
 	w.SetContent(container.NewVScroll(list))
