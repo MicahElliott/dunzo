@@ -455,6 +455,12 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	var refreshCompleted func()   // forward decl -- used inside refreshOpenItems's Done button, defined below
 	var refreshLastDone func()    // forward decl -- used inside refreshOpenItems's Done button and saveEntry, defined further below (needs lastDoneLabel)
 	var itemsAccordion *widget.Accordion // forward decl -- used inside refreshOpenItems's Done/Postpone/Discard buttons, defined below
+	// showAllPlanned toggles whether Planned's non-TODO categories
+	// (GOAL/WAITING/QUESTION/FIXME/RISK) are shown -- default false
+	// (TODO-only) since the full set together was feeling
+	// overwhelming; a "Show all" / "Show TODOs only" toggle button
+	// reveals/hides the rest without losing them.
+	showAllPlanned := false
 	refreshOpenItems = func() {
 		openItemsBox.RemoveAll()
 		items := getOpenItems()
@@ -473,7 +479,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 							itemsAccordion.Refresh()
 						})
 					}),
-					newHoverButton("🐌", "Postpone", func() {
+					newHoverIconButton(theme.Icon(theme.IconNameHistory), "Postpone", func() {
 						recordPostponed(item)
 						fyne.Do(func() {
 							refreshOpenItems()
@@ -494,10 +500,37 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			openItemsBox.Add(row)
 		}
 		cats, grouped := groupOpenItemsByCategory(items)
+		otherCount := 0
 		for _, cat := range cats {
+			if cat != "TODO" {
+				otherCount += len(grouped[cat])
+				continue
+			}
 			openItemsBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
 			for _, item := range grouped[cat] {
 				addRow(item)
+			}
+		}
+		if otherCount > 0 {
+			toggleLabel := fmt.Sprintf("Show all (%d more)", otherCount)
+			if showAllPlanned {
+				toggleLabel = "Show TODOs only"
+			}
+			openItemsBox.Add(widget.NewButton(toggleLabel, func() {
+				showAllPlanned = !showAllPlanned
+				refreshOpenItems()
+				itemsAccordion.Refresh()
+			}))
+			if showAllPlanned {
+				for _, cat := range cats {
+					if cat == "TODO" {
+						continue
+					}
+					openItemsBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
+					for _, item := range grouped[cat] {
+						addRow(item)
+					}
+				}
 			}
 		}
 		openItemsBox.Refresh()
@@ -526,7 +559,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			for _, item := range grouped[cat] {
 				item := item // capture
 				row := container.NewBorder(nil, nil, nil,
-					newHoverButton("✏️", "Edit", func() {
+					newHoverIconButton(theme.Icon(theme.IconNameDocumentCreate), "Edit", func() {
 						showEditItemDialog(w4, item, func() {
 							fyne.Do(func() {
 								refreshCompleted()
@@ -566,7 +599,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			for _, item := range grouped[cat] {
 				item := item // capture
 				row := container.NewBorder(nil, nil, nil,
-					newHoverButton("✏️", "Edit", func() {
+					newHoverIconButton(theme.Icon(theme.IconNameDocumentCreate), "Edit", func() {
 						showEditItemDialog(w4, item, func() {
 							fyne.Do(func() {
 								refreshReflections()
