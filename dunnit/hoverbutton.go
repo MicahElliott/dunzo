@@ -33,6 +33,21 @@ func newHoverButton(label, tooltip string, tapped func()) *hoverButton {
 	return b
 }
 
+// newHoverIconButton is newHoverButton's icon-based sibling, for
+// actions with a good Fyne theme.IconName* match (e.g. Delete,
+// Discard, Done) -- theme icons are consistent/theme-aware (respect
+// light/dark, OS look) and preferred over emoji glyphs where a good
+// conceptual match exists. Actions without a good match (e.g. Edit --
+// Fyne's icon set has no pencil icon; Postpone -- no snooze/defer
+// icon) should keep using newHoverButton's emoji instead.
+func newHoverIconButton(icon fyne.Resource, tooltip string, tapped func()) *hoverButton {
+	b := &hoverButton{tooltip: tooltip}
+	b.Icon = icon
+	b.OnTapped = tapped
+	b.ExtendBaseWidget(b)
+	return b
+}
+
 const hoverButtonTooltipDelay = 400 * time.Millisecond
 
 // tooltipPopup wraps widget.PopUp to fix a real click-swallowing bug:

@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -183,7 +184,7 @@ func showRecurringItemsDialog(a fyne.App, parent fyne.Window) {
 				detail = "monthly (day " + strconv.Itoa(r.DayOfMonth) + ")"
 			}
 			row := container.NewBorder(nil, nil, nil,
-				newHoverButton("🗑️", "Delete", func() {
+				newHoverIconButton(theme.Icon(theme.IconNameDelete), "Delete", func() {
 					items = append(items[:i], items[i+1:]...)
 					saveAll()
 					refreshItems()

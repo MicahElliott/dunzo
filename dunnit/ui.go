@@ -466,7 +466,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		addRow := func(item OpenItem) {
 			row := container.NewBorder(nil, nil, nil,
 				container.NewHBox(
-					newHoverButton("❌", "Discard", func() {
+					newHoverIconButton(theme.Icon(theme.IconNameContentClear), "Discard", func() {
 						recordDiscarded(item)
 						fyne.Do(func() {
 							refreshOpenItems()
@@ -480,7 +480,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 							itemsAccordion.Refresh()
 						})
 					}),
-					newHoverButton("✔️", "Done", func() {
+					newHoverIconButton(theme.Icon(theme.IconNameConfirm), "Done", func() {
 						recordConvertedDone(item)
 						fyne.Do(func() {
 							refreshOpenItems()
