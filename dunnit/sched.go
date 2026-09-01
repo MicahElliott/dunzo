@@ -33,10 +33,21 @@ func isFirstWeekdayOfMonth(now time.Time) bool {
 	return now.Day() == first.Day()
 }
 
-// withinWorkHours reports whether now falls between the configured
-// day_start and day_end (inclusive), Mon-Fri only.
-func withinWorkHours(cfg Config, now time.Time) bool {
+// isOffDay reports whether now is a day Dunzo's nudges should be
+// entirely suppressed: a weekend, or (if cfg.SkipUSFederalHolidays is
+// enabled) a US federal holiday, treated identically to a weekend.
+func isOffDay(cfg Config, now time.Time) bool {
 	if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
+		return true
+	}
+	return cfg.SkipUSFederalHolidays && isUSFederalHoliday(now)
+}
+
+// withinWorkHours reports whether now falls between the configured
+// day_start and day_end (inclusive), Mon-Fri only (see isOffDay --
+// also excludes US federal holidays if that setting is enabled).
+func withinWorkHours(cfg Config, now time.Time) bool {
+	if isOffDay(cfg, now) {
 		return false
 	}
 	startH, startM := parseHM(cfg.DayStart)
@@ -136,7 +147,7 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 			gocron.DailyJob(1, gocron.NewAtTimes(gocron.NewAtTime(uint(sh), uint(sm), 0))),
 			gocron.NewTask(func() {
 				now := time.Now()
-				if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
+				if isOffDay(LoadConfig(), now) {
 					return
 				}
 				if isFirstWeekdayOfMonth(now) {
@@ -164,7 +175,7 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 			gocron.DailyJob(1, gocron.NewAtTimes(gocron.NewAtTime(uint(eh), uint(em), 0))),
 			gocron.NewTask(func() {
 				now := time.Now()
-				if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
+				if isOffDay(LoadConfig(), now) {
 					return
 				}
 				a.SendNotification(fyne.NewNotification(

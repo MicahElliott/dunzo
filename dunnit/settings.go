@@ -45,6 +45,9 @@ func showSettings(a fyne.App) {
 	snoozeMinutes := widget.NewEntry()
 	snoozeMinutes.SetText(strconv.Itoa(cfg.SnoozeMinutes))
 
+	skipHolidays := widget.NewCheck("", nil)
+	skipHolidays.SetChecked(cfg.SkipUSFederalHolidays)
+
 	form := widget.NewForm(
 		widget.NewFormItem("Day Start (HH:MM)", dayStart),
 		widget.NewFormItem("Day End (HH:MM)", dayEnd),
@@ -54,6 +57,7 @@ func showSettings(a fyne.App) {
 		widget.NewFormItem("Weekly Digest Time (HH:MM)", digestTime),
 		widget.NewFormItem("Auto-draft Daily Summary at EOD", autoDraft),
 		widget.NewFormItem("Default Snooze (minutes)", snoozeMinutes),
+		widget.NewFormItem("Skip US Federal Holidays", skipHolidays),
 	)
 	form.OnSubmit = func() {
 		minutes, err := strconv.Atoi(nudgeInterval.Text)
@@ -78,6 +82,7 @@ func showSettings(a fyne.App) {
 		newCfg.WeeklyDigestTime = digestTime.Text
 		newCfg.AutoDraftDailySummary = autoDraft.Checked
 		newCfg.SnoozeMinutes = snooze
+		newCfg.SkipUSFederalHolidays = skipHolidays.Checked
 		if err := writeConfig(newCfg); err != nil {
 			dialog.ShowError(err, w)
 			return
@@ -98,6 +103,6 @@ func showSettings(a fyne.App) {
 	})
 
 	w.SetContent(container.NewVBox(form, recurringMeetingsBtn, recurringItemsBtn))
-	w.Resize(fyne.NewSize(320, 340))
+	w.Resize(fyne.NewSize(320, 380))
 	w.Show()
 }

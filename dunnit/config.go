@@ -81,6 +81,12 @@ type Config struct {
 	// monthly cadence. Daily/weekly are surfaced in SOD; monthly in
 	// SOM. Managed via showRecurringItemsDialog (recurring.go).
 	RecurringItems []RecurringItem `toml:"recurring_item"`
+
+	// SkipUSFederalHolidays, when true, treats the 11 US federal
+	// holidays (see holidays.go's isUSFederalHoliday) the same as a
+	// weekend day -- no hourly/lunch/SOD/EOD nudges. Default false
+	// (opt-in), toggled via Settings.
+	SkipUSFederalHolidays bool `toml:"skip_us_federal_holidays"`
 }
 
 // defaultConfig mirrors the values from dunnit's config-example.zsh.
