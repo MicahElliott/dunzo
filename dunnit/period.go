@@ -142,3 +142,65 @@ func periodDataRange(period summaryPeriod, anchor time.Time) (from, to time.Time
 	pad := time.Duration(periodDataRangePadDays) * 24 * time.Hour
 	return from.Add(-pad), to.Add(pad)
 }
+
+// kickoffEnabled/reviewEnabled/themeFor read a unit's Kickoff/Review
+// toggle or theme setting out of cfg, keyed by period -- small
+// switch-based accessors so callers work in terms of summaryPeriod
+// rather than reaching into Config's individual per-unit fields
+// directly.
+func kickoffEnabled(cfg Config, period summaryPeriod) bool {
+	switch period {
+	case periodDay:
+		return cfg.KickoffDayEnabled
+	case periodWeek:
+		return cfg.KickoffWeekEnabled
+	case periodMonth:
+		return cfg.KickoffMonthEnabled
+	case periodQuarter:
+		return cfg.KickoffQuarterEnabled
+	case periodYear:
+		return cfg.KickoffYearEnabled
+	default:
+		return false
+	}
+}
+
+func reviewEnabled(cfg Config, period summaryPeriod) bool {
+	switch period {
+	case periodDay:
+		return cfg.ReviewDayEnabled
+	case periodWeek:
+		return cfg.ReviewWeekEnabled
+	case periodMonth:
+		return cfg.ReviewMonthEnabled
+	case periodQuarter:
+		return cfg.ReviewQuarterEnabled
+	case periodYear:
+		return cfg.ReviewYearEnabled
+	default:
+		return false
+	}
+}
+
+// themeFor returns cfg's configured default theme for period, falling
+// back to periodConfigs' DefaultTheme if unset (e.g. an older
+// config.toml written before theme fields existed, decoded to "").
+func themeFor(cfg Config, period summaryPeriod) string {
+	var theme string
+	switch period {
+	case periodDay:
+		theme = cfg.ThemeDay
+	case periodWeek:
+		theme = cfg.ThemeWeek
+	case periodMonth:
+		theme = cfg.ThemeMonth
+	case periodQuarter:
+		theme = cfg.ThemeQuarter
+	case periodYear:
+		theme = cfg.ThemeYear
+	}
+	if theme != "" {
+		return theme
+	}
+	return periodConfigs[period].DefaultTheme
+}

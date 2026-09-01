@@ -87,6 +87,37 @@ type Config struct {
 	// weekend day -- no hourly/lunch/SOD/EOD nudges. Default false
 	// (opt-in), toggled via Settings.
 	SkipUSFederalHolidays bool `toml:"skip_us_federal_holidays"`
+
+	// KickoffEnabled/ReviewEnabled gate each of the 5 units'
+	// Kickoff/Review surfaces independently (see
+	// docs/kickoff-review-design.md) -- the primary lever for "5
+	// units is a lot to ask": a unit's toggle off means it's never
+	// shown, automatically or via the Kickoff.../Review... tray
+	// submenus. Day/Week/Month default on (they cover today's
+	// existing SOD/EOD/SOM); Quarter/Year default off since they're
+	// new, no-prior-art surfaces a user should opt into.
+	KickoffDayEnabled     bool `toml:"kickoff_day_enabled"`
+	KickoffWeekEnabled    bool `toml:"kickoff_week_enabled"`
+	KickoffMonthEnabled   bool `toml:"kickoff_month_enabled"`
+	KickoffQuarterEnabled bool `toml:"kickoff_quarter_enabled"`
+	KickoffYearEnabled    bool `toml:"kickoff_year_enabled"`
+
+	ReviewDayEnabled     bool `toml:"review_day_enabled"`
+	ReviewWeekEnabled    bool `toml:"review_week_enabled"`
+	ReviewMonthEnabled   bool `toml:"review_month_enabled"`
+	ReviewQuarterEnabled bool `toml:"review_quarter_enabled"`
+	ReviewYearEnabled    bool `toml:"review_year_enabled"`
+
+	// ThemeDay/Week/Month/Quarter/Year hold each unit's standing
+	// default Review theme (one of the Theme* constants in
+	// period.go) -- individual Review invocations may still override
+	// this just for that one instance via a dropdown on the dialog,
+	// without changing this stored default.
+	ThemeDay     string `toml:"theme_day"`
+	ThemeWeek    string `toml:"theme_week"`
+	ThemeMonth   string `toml:"theme_month"`
+	ThemeQuarter string `toml:"theme_quarter"`
+	ThemeYear    string `toml:"theme_year"`
 }
 
 // defaultConfig mirrors the values from dunnit's config-example.zsh.
@@ -97,6 +128,28 @@ func defaultConfig() Config {
 		NudgeIntervalMinutes: 60,
 		LunchTime:            "11:30",
 		SnoozeMinutes:        15,
+
+		// Day/Week/Month default on (they cover today's existing
+		// SOD/EOD/SOM); Quarter/Year default off, opt-in, since
+		// they're new surfaces with no prior art (see
+		// docs/kickoff-review-design.md).
+		KickoffDayEnabled:     true,
+		KickoffWeekEnabled:    true,
+		KickoffMonthEnabled:   true,
+		KickoffQuarterEnabled: false,
+		KickoffYearEnabled:    false,
+
+		ReviewDayEnabled:     true,
+		ReviewWeekEnabled:    true,
+		ReviewMonthEnabled:   true,
+		ReviewQuarterEnabled: false,
+		ReviewYearEnabled:    false,
+
+		ThemeDay:     ThemePersonalNotes,
+		ThemeWeek:    ThemePersonalNotes,
+		ThemeMonth:   ThemeStatusReport,
+		ThemeQuarter: ThemeFormalReport,
+		ThemeYear:    ThemeFormalReport,
 	}
 }
 
