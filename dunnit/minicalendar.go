@@ -23,22 +23,36 @@ var hmPattern = regexp.MustCompile(`^([01]?[0-9]|2[0-3]):[0-5][0-9]$`)
 // RecurringMeeting is one user-entered recurring meeting slot
 // (FR-15) -- purely user-entered, no calendar/.ics/EventKit
 // integration. Tag should include the leading "#" (normalized on
-// save). DOW is 0=Sunday..6=Saturday (matches time.Weekday) so it
-// sorts/compares naturally against time.Now().Weekday(). Time is
-// "HH:MM" 24-hour. IntervalWeeks is "every N weeks" (1 = every week,
-// the common case; 2 = biweekly, etc; treated as 1 if <= 0, e.g. for
-// entries saved before this field existed). AnchorDate ("YYYY-MM-DD")
-// is the first occurrence's date, used to compute which weeks count
-// for IntervalWeeks > 1 -- without it there'd be no way to know which
+// save). Cadence is "weekly" (default/legacy, uses DOW+IntervalWeeks)
+// or "daily" (fires every day at Time, or every weekday if
+// WeekendPolicy is "skip" -- the common shape for a daily standup,
+// letting one entry replace 5 separate weekday rows). DOW is
+// 0=Sunday..6=Saturday (matches time.Weekday, only meaningful for
+// "weekly") so it sorts/compares naturally against
+// time.Now().Weekday(). Time is "HH:MM" 24-hour. IntervalWeeks is
+// "every N weeks" (1 = every week, the common case; 2 = biweekly,
+// etc; treated as 1 if <= 0, e.g. for entries saved before this field
+// existed; not meaningful for "daily"). AnchorDate ("YYYY-MM-DD") is
+// the first occurrence's date, used to compute which weeks count for
+// IntervalWeeks > 1 -- without it there'd be no way to know which
 // week is "week 1" of the cadence. Set once at creation and left
 // alone afterward.
 type RecurringMeeting struct {
 	Tag           string `toml:"tag"`
+	Cadence       string `toml:"cadence"` // "weekly" (default/legacy) or "daily"
 	DOW           int    `toml:"dow"`
 	Time          string `toml:"time"`
 	IntervalWeeks int    `toml:"interval_weeks"`
 	AnchorDate    string `toml:"anchor_date"`
+	WeekendPolicy string `toml:"weekend_policy"` // "include" (default) or "skip" -- daily only
 }
+
+// meetingCadenceOptions are the choices for a RecurringMeeting's
+// cadence -- "Weekly" is the original/default shape (day-of-week +
+// every-N-weeks interval); "Daily" fires every day (or every weekday,
+// per WeekendPolicy), replacing what used to require 5 separate
+// weekly rows (one per weekday) for something like a daily standup.
+var meetingCadenceOptions = []string{"Weekly", "Daily"}
 
 // dowNames indexes by time.Weekday (0=Sunday..6=Saturday).
 var dowNames = []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
@@ -57,15 +71,24 @@ func showMiniCalendarDialog(a fyne.App, parent fyne.Window) {
 		},
 		func(i widget.ListItemID, o fyne.CanvasObject) {
 			m := meetings[i]
-			interval := m.IntervalWeeks
-			if interval <= 0 {
-				interval = 1
+			var detail string
+			if m.Cadence == "daily" {
+				detail = "daily " + m.Time
+				if m.WeekendPolicy == "skip" {
+					detail += " (weekdays only)"
+				}
+			} else {
+				interval := m.IntervalWeeks
+				if interval <= 0 {
+					interval = 1
+				}
+				every := "every week"
+				if interval > 1 {
+					every = fmt.Sprintf("every %d weeks", interval)
+				}
+				detail = dowNames[m.DOW] + " " + m.Time + " (" + every + ")"
 			}
-			every := "every week"
-			if interval > 1 {
-				every = fmt.Sprintf("every %d weeks", interval)
-			}
-			o.(*widget.Label).SetText(m.Tag + " -- " + dowNames[m.DOW] + " " + m.Time + " (" + every + ")")
+			o.(*widget.Label).SetText(m.Tag + " -- " + detail)
 		},
 	)
 
@@ -116,8 +139,19 @@ func showMiniCalendarDialog(a fyne.App, parent fyne.Window) {
 		})
 	}
 
+	cadenceSelect := widget.NewSelect(meetingCadenceOptions, nil)
+	cadenceSelect.SetSelected("Weekly")
+
 	dowSelect := widget.NewSelect(dowNames, nil)
 	dowSelect.SetSelected(dowNames[time.Monday])
+
+	// weekendSelect (only relevant/shown for "Daily") mirrors
+	// recurring.go's weekendPolicyOptions dropdown for the same
+	// feature on RecurringItem, for consistency between the two
+	// recurring-something dialogs.
+	weekendSelect := widget.NewSelect(weekendPolicyOptions, nil)
+	weekendSelect.SetSelected(weekendPolicyOptions[0])
+	weekendSelect.Hide()
 
 	// timeEntry/intervalEntry are wrapped in fixed-size GridWrap
 	// containers (same fix as minsInput in ui.go) -- otherwise Fyne's
@@ -131,6 +165,25 @@ func showMiniCalendarDialog(a fyne.App, parent fyne.Window) {
 	intervalEntry.SetPlaceHolder("1")
 	intervalEntry.SetText("1")
 	intervalWrapper := container.NewGridWrap(fyne.NewSize(50, intervalEntry.MinSize().Height), intervalEntry)
+	intervalLabel := widget.NewLabel("every")
+	weekLabel := widget.NewLabel("week(s)")
+
+	cadenceSelect.OnChanged = func(c string) {
+		daily := c == "Daily"
+		if daily {
+			dowSelect.Hide()
+			intervalLabel.Hide()
+			intervalWrapper.Hide()
+			weekLabel.Hide()
+			weekendSelect.Show()
+		} else {
+			dowSelect.Show()
+			intervalLabel.Show()
+			intervalWrapper.Show()
+			weekLabel.Show()
+			weekendSelect.Hide()
+		}
+	}
 
 	saveAll := func() {
 		newCfg := cfg
@@ -150,6 +203,23 @@ func showMiniCalendarDialog(a fyne.App, parent fyne.Window) {
 			dialog.ShowError(errors.New("time must be HH:MM (24-hour)"), parent)
 			return
 		}
+		if cadenceSelect.Selected == "Daily" {
+			weekendPolicy := ""
+			if weekendSelect.Selected == weekendPolicyOptions[1] {
+				weekendPolicy = "skip"
+			}
+			meetings = append(meetings, RecurringMeeting{
+				Tag:           tag,
+				Cadence:       "daily",
+				Time:          timeEntry.Text,
+				WeekendPolicy: weekendPolicy,
+			})
+			saveAll()
+			list.Refresh()
+			tagEntry.SetText("")
+			timeEntry.SetText("")
+			return
+		}
 		interval, err := strconv.Atoi(strings.TrimSpace(intervalEntry.Text))
 		if err != nil || interval <= 0 {
 			dialog.ShowError(errors.New("every N weeks must be a positive number"), parent)
@@ -163,6 +233,7 @@ func showMiniCalendarDialog(a fyne.App, parent fyne.Window) {
 		}
 		meetings = append(meetings, RecurringMeeting{
 			Tag:           tag,
+			Cadence:       "weekly",
 			DOW:           dow,
 			Time:          timeEntry.Text,
 			IntervalWeeks: interval,
@@ -190,8 +261,9 @@ func showMiniCalendarDialog(a fyne.App, parent fyne.Window) {
 	content := container.NewBorder(
 		container.NewVBox(
 			widget.NewLabel("Recurring Meetings"),
+			widget.NewRichTextFromMarkdown("*Use these tags throughout your weeks any time a meeting topic thought comes to mind. They'll be collected and presented to you just before your meeting starts.*"),
 			tagEntry,
-			container.NewHBox(dowSelect, timeWrapper, widget.NewLabel("every"), intervalWrapper, widget.NewLabel("week(s)"), addBtn),
+			container.NewHBox(cadenceSelect, dowSelect, timeWrapper, intervalLabel, intervalWrapper, weekLabel, weekendSelect, addBtn),
 		),
 		deleteBtn,
 		nil, nil,
@@ -200,17 +272,33 @@ func showMiniCalendarDialog(a fyne.App, parent fyne.Window) {
 
 	w := a.NewWindow("Recurring Meetings")
 	w.SetContent(content)
-	w.Resize(fyne.NewSize(480, 400))
+	w.Resize(fyne.NewSize(560, 420))
 	w.Show()
 }
 
 // nextOccurrence returns the next time (today or later) that m is
-// scheduled, given now. For IntervalWeeks > 1, only weeks that are an
-// exact multiple of IntervalWeeks away from AnchorDate's week count;
-// candidates in between are skipped. Falls back to every-week
-// behavior if AnchorDate is missing/unparseable (e.g. legacy entries).
+// scheduled, given now. For "daily" cadence, that's simply today's
+// (or tomorrow's, if today's time has passed) occurrence at m.Time,
+// skipping weekends if WeekendPolicy is "skip" -- no DOW/
+// IntervalWeeks involved. For "weekly" (default/legacy), IntervalWeeks
+// > 1 only counts weeks that are an exact multiple of IntervalWeeks
+// away from AnchorDate's week count; candidates in between are
+// skipped. Falls back to every-week behavior if AnchorDate is
+// missing/unparseable (e.g. legacy entries).
 func nextOccurrence(m RecurringMeeting, now time.Time) time.Time {
 	hh, mm := parseHM(m.Time)
+
+	if m.Cadence == "daily" {
+		candidate := time.Date(now.Year(), now.Month(), now.Day(), hh, mm, 0, 0, now.Location())
+		if !candidate.After(now) {
+			candidate = candidate.AddDate(0, 0, 1)
+		}
+		for m.WeekendPolicy == "skip" && (candidate.Weekday() == time.Saturday || candidate.Weekday() == time.Sunday) {
+			candidate = candidate.AddDate(0, 0, 1)
+		}
+		return candidate
+	}
+
 	interval := m.IntervalWeeks
 	if interval <= 0 {
 		interval = 1
@@ -262,8 +350,16 @@ func lastOccurrence(m RecurringMeeting, now time.Time) time.Time {
 	// recent past occurrence is exactly one cadence period before
 	// whatever it returns when starting the search from just after
 	// that prior occurrence. Simplest robust approach: step backward
-	// a week at a time (respecting IntervalWeeks) until we find an
+	// one cadence unit at a time (a day for "daily", a week at a time
+	// respecting IntervalWeeks for "weekly") until we find an
 	// occurrence at or before now.
+	if m.Cadence == "daily" {
+		candidate := next.AddDate(0, 0, -1)
+		for candidate.After(now) || (m.WeekendPolicy == "skip" && (candidate.Weekday() == time.Saturday || candidate.Weekday() == time.Sunday)) {
+			candidate = candidate.AddDate(0, 0, -1)
+		}
+		return candidate
+	}
 	interval := m.IntervalWeeks
 	if interval <= 0 {
 		interval = 1
