@@ -23,6 +23,7 @@ const (
 	periodWeek    summaryPeriod = "Week"
 	periodMonth   summaryPeriod = "Month"
 	periodQuarter summaryPeriod = "Quarter"
+	periodYear    summaryPeriod = "Year"
 )
 
 // ledgerFilesFor returns the paths of ledger files under DunzoDir()
@@ -38,6 +39,8 @@ func ledgerFilesFor(period summaryPeriod, now time.Time) []string {
 		cutoff = now.AddDate(0, -1, 0)
 	case periodQuarter:
 		cutoff = now.AddDate(0, -3, 0)
+	case periodYear:
+		cutoff = now.AddDate(-1, 0, 0)
 	default:
 		cutoff = now.AddDate(0, 0, -1)
 	}
