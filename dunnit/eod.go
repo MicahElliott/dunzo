@@ -98,17 +98,19 @@ func showEODWindow(a fyne.App) {
 	w := a.NewWindow("Dunzo: End of Day")
 
 	// Today's items, shown first -- read-only, so the user has the
-	// full day in view before answering anything below.
-	todayBody := widget.NewMultiLineEntry()
-	todayBody.SetText(strings.Join(readLedgerLines(), "\n"))
+	// full day in view before answering anything below. Uses a plain
+	// widget.Label rather than a disabled MultiLineEntry: disabling
+	// an Entry recolors its text via theme.ColorNameDisabled, which
+	// (at least with the LightTheme this app forces via
+	// a.Settings().SetTheme) renders too close to the background to
+	// read -- the box looked entirely blank even though the text was
+	// there. Label has no such disabled-state recoloring.
+	todayBody := widget.NewLabel(strings.Join(readLedgerLines(), "\n"))
 	todayBody.Wrapping = fyne.TextWrapWord
-	todayBody.SetMinRowsVisible(10)
-	todayBody.Disable() // read-only display
 	// Wrapped in a Scroll for the form (so a long day doesn't blow up
 	// the whole window), but Scroll doesn't inherit its child's
 	// MinSize by default -- without an explicit SetMinSize here, it
-	// renders at whatever tiny default the form layout gives it,
-	// ignoring todayBody's own SetMinRowsVisible(10) above.
+	// renders at whatever tiny default the form layout gives it.
 	todayScroll := container.NewVScroll(todayBody)
 	todayScroll.SetMinSize(fyne.NewSize(0, 220)) // room for ~8+ lines
 
@@ -118,10 +120,27 @@ func showEODWindow(a fyne.App) {
 	// background since it shells out to gh copilot; the field starts
 	// with a placeholder and is editable once (or before) the draft
 	// arrives, so the user can always tweak/replace it before Finalize
-	// Day.
+	// Day. A rendered-markdown preview (summaryPreview) sits below the
+	// raw editable text -- the AI draft often comes back with markdown
+	// (headers/bold/lists) that's hard to read as literal "**bold**"
+	// text in a plain entry field, so this renders it properly via
+	// Fyne's built-in widget.NewRichTextFromMarkdown, updating live as
+	// the summary is edited.
 	summary := widget.NewMultiLineEntry()
 	summary.SetPlaceHolder("Generating an AI summary of today, please wait (feel free to edit once it arrives, or type your own now)...")
-	summary.SetMinRowsVisible(5)
+	summary.SetMinRowsVisible(10)
+	summaryPreview := widget.NewRichTextFromMarkdown("")
+	summaryPreview.Wrapping = fyne.TextWrapWord
+	summary.OnChanged = func(text string) {
+		summaryPreview.ParseMarkdown(text)
+	}
+	summaryPreviewScroll := container.NewVScroll(summaryPreview)
+	summaryPreviewScroll.SetMinSize(fyne.NewSize(0, 160))
+	summaryBox := container.NewVBox(
+		summary,
+		widget.NewLabelWithStyle("Preview:", fyne.TextAlignLeading, fyne.TextStyle{Italic: true}),
+		summaryPreviewScroll,
+	)
 	go func() {
 		ledgerText := gatherLedgerTextForDate(time.Now())
 		if strings.TrimSpace(ledgerText) == "" {
@@ -135,6 +154,7 @@ func showEODWindow(a fyne.App) {
 			}
 			if strings.TrimSpace(summary.Text) == "" {
 				summary.SetText(draft)
+				summaryPreview.ParseMarkdown(draft)
 			}
 		})
 	}()
@@ -159,7 +179,7 @@ func showEODWindow(a fyne.App) {
 
 	items := []*widget.FormItem{
 		widget.NewFormItem("Today's Items", todayScroll),
-		widget.NewFormItem("Summary", summary),
+		widget.NewFormItem("Summary", summaryBox),
 		widget.NewFormItem("Productivity (1-5)", productivity),
 		widget.NewFormItem("Meeting Hours", meetingHours),
 		widget.NewFormItem("Sentiment", sentiment),
@@ -223,6 +243,6 @@ func showEODWindow(a fyne.App) {
 	}
 
 	w.SetContent(container.NewVScroll(form))
-	w.Resize(fyne.NewSize(560, 820))
+	w.Resize(fyne.NewSize(560, 980))
 	w.Show()
 }
