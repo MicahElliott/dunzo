@@ -2,7 +2,6 @@ package dun
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -87,7 +86,7 @@ func showSOMWindow(a fyne.App) {
 	// exposes parsed RichText segments, not the original markdown
 	// string, so this is tracked separately.
 	digestText := ""
-	digestSavePath := filepath.Join(DunzoDir(), "som-"+from.Format("200601")+".md")
+	digestSavePath := periodReportPath("som", from, "200601")
 	copyDigestBtn := widget.NewButtonWithIcon("Copy", theme.Icon(theme.IconNameContentCopy), func() {
 		a.Clipboard().SetContent(digestText)
 	})

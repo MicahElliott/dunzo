@@ -3,8 +3,6 @@ package dun
 import (
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -157,44 +155,12 @@ func summarizeStandupWithCopilot(lines []string) (string, error) {
 			"notable). Be concise.", strings.Join(lines, "\n"))
 }
 
-// dsuSavePath returns the path a generated standup summary should be
-// saved to: DunzoDir()/dsu-YYYYMMDD.md, dated today.
-func dsuSavePath(now time.Time) string {
-	return filepath.Join(DunzoDir(), "dsu-"+now.Format("20060102")+".md")
-}
-
 // showGeneratedStandupSummary displays an AI-generated standup
-// summary in a small overlay-style window (its own standalone
-// a.NewWindow, not parented as a dialog.Dialog -- simpler to give it
-// its own Copy/Save actions and resize freely) with Copy (clipboard)
-// and Save (writes to dsuSavePath) actions.
+// summary via the shared showGeneratedReport window (Copy/Save/
+// Close), saving to periodReportPath("dsu", today, "20060102").
 func showGeneratedStandupSummary(a fyne.App, parent fyne.Window, summary string) {
-	body := widget.NewRichTextFromMarkdown(summary)
-	body.Wrapping = fyne.TextWrapWord
-	scroll := container.NewVScroll(body)
-	scroll.SetMinSize(fyne.NewSize(0, 260))
-
-	w := a.NewWindow("Dunzo: Generated Standup Summary")
-
-	copyBtn := widget.NewButtonWithIcon("Copy", theme.Icon(theme.IconNameContentCopy), func() {
-		a.Clipboard().SetContent(summary)
-	})
-	saveBtn := widget.NewButtonWithIcon("Save", theme.Icon(theme.IconNameDocumentSave), func() {
-		path := dsuSavePath(time.Now())
-		if err := os.WriteFile(path, []byte(summary), 0644); err != nil {
-			dialog.ShowError(err, w)
-			return
-		}
-		dialog.ShowInformation("Saved", "Saved to "+path, w)
-	})
-
-	w.SetContent(container.NewBorder(nil,
-		container.NewHBox(copyBtn, saveBtn, widget.NewButton("Close", func() { w.Close() })),
-		nil, nil,
-		scroll,
-	))
-	w.Resize(fyne.NewSize(520, 420))
-	w.Show()
+	showGeneratedReport(a, "Dunzo: Generated Standup Summary",
+		periodReportPath("dsu", time.Now(), "20060102"), summary)
 }
 
 // showStandupExport builds the deterministic standup summary (FR-17
