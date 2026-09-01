@@ -91,6 +91,10 @@ func showEditItemDialog(parent fyne.Window, item OpenItem, onSave func()) {
 		}
 		onSave()
 	}, parent)
+	// Fyne's default dialog width is quite narrow for a full ledger
+	// line of text -- widen it so longer entries aren't cramped/
+	// wrapped awkwardly while editing.
+	d.Resize(fyne.NewSize(520, 160))
 	d.Show()
 }
 

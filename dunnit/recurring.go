@@ -2,6 +2,7 @@ package dun
 
 import (
 	"errors"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -22,7 +23,10 @@ import (
 // or "monthly". DOW (0=Sunday..6=Saturday, only meaningful for
 // "weekly") mirrors RecurringMeeting.DOW. DayOfMonth (1-31, only
 // meaningful for "monthly") is clamped to the last day of shorter
-// months so e.g. 31 still fires in February.
+// months so e.g. 31 still fires in February. WeekendPolicy (only
+// meaningful for "daily") is "include" or "skip" -- empty string
+// (e.g. entries saved before this field existed) is treated as
+// "include", preserving old behavior.
 //
 // Per design decision: these are surfaced as *suggestions* (SOD for
 // daily/weekly, SOM for monthly) rather than auto-seeded into the
@@ -30,19 +34,30 @@ import (
 // avoiding duplicate-looking ledger noise if they already logged the
 // same thing by hand.
 type RecurringItem struct {
-	Category   string `toml:"category"`
-	Text       string `toml:"text"`
-	Cadence    string `toml:"cadence"` // "daily", "weekly", "monthly"
-	DOW        int    `toml:"dow"`
-	DayOfMonth int    `toml:"day_of_month"`
+	Category      string `toml:"category"`
+	Text          string `toml:"text"`
+	Cadence       string `toml:"cadence"` // "daily", "weekly", "monthly"
+	DOW           int    `toml:"dow"`
+	DayOfMonth    int    `toml:"day_of_month"`
+	WeekendPolicy string `toml:"weekend_policy"` // "include" (default) or "skip" -- daily only
 }
 
 var cadenceOptions = []string{"daily", "weekly", "monthly"}
+
+// weekendPolicyOptions are the choices for a "daily" RecurringItem's
+// weekend handling, shown as a second dropdown next to Cadence (a
+// dropdown rather than a toggle/checkbox for visual consistency with
+// weekly's day-of-week and monthly's day-of-month selectors, even
+// though a toggle would be a more natural fit for a binary choice).
+var weekendPolicyOptions = []string{"Include weekends", "Skip weekends"}
 
 // isDueToday reports whether r's cadence puts it due on now's date.
 func (r RecurringItem) isDueToday(now time.Time) bool {
 	switch r.Cadence {
 	case "daily":
+		if r.WeekendPolicy == "skip" && (now.Weekday() == time.Saturday || now.Weekday() == time.Sunday) {
+			return false
+		}
 		return true
 	case "weekly":
 		return int(now.Weekday()) == r.DOW
@@ -114,6 +129,7 @@ func recurringItemsSuggestionBox(items []RecurringItem, onAdded func()) fyne.Can
 		label := widget.NewLabel(r.Category + ": " + r.Text)
 		var addBtn *widget.Button
 		addBtn = widget.NewButton("Add", func() {
+			log.Println("recurringItemsSuggestionBox Add clicked:", r.Category, r.Text)
 			recordActivity(r.Text, r.Category)
 			label.SetText("[added] " + r.Category + ": " + r.Text)
 			addBtn.Disable()
@@ -157,6 +173,10 @@ func showRecurringItemsDialog(a fyne.App, parent fyne.Window) {
 			i := i // capture
 			detail := r.Cadence
 			switch r.Cadence {
+			case "daily":
+				if r.WeekendPolicy == "skip" {
+					detail = "daily (weekdays only)"
+				}
 			case "weekly":
 				detail = "weekly (" + dowNames[r.DOW] + ")"
 			case "monthly":
@@ -190,6 +210,13 @@ func showRecurringItemsDialog(a fyne.App, parent fyne.Window) {
 	cadenceSelect := widget.NewSelect(cadenceOptions, nil)
 	cadenceSelect.SetSelected("daily")
 
+	// weekendSelect (only relevant/shown for "daily") mirrors weekly's
+	// day-of-week and monthly's day-of-month selectors visually --
+	// a dropdown for consistency, even though a checkbox/toggle would
+	// be the more natural widget for a plain binary choice.
+	weekendSelect := widget.NewSelect(weekendPolicyOptions, nil)
+	weekendSelect.SetSelected(weekendPolicyOptions[0])
+
 	dowSelect := widget.NewSelect(dowNames, nil)
 	dowSelect.SetSelected(dowNames[time.Monday])
 	dowSelect.Hide()
@@ -200,9 +227,12 @@ func showRecurringItemsDialog(a fyne.App, parent fyne.Window) {
 	domWrapper.Hide()
 
 	cadenceSelect.OnChanged = func(c string) {
+		weekendSelect.Hide()
 		dowSelect.Hide()
 		domWrapper.Hide()
 		switch c {
+		case "daily":
+			weekendSelect.Show()
 		case "weekly":
 			dowSelect.Show()
 		case "monthly":
@@ -224,6 +254,10 @@ func showRecurringItemsDialog(a fyne.App, parent fyne.Window) {
 			Cadence:  cadenceSelect.Selected,
 		}
 		switch r.Cadence {
+		case "daily":
+			if weekendSelect.Selected == weekendPolicyOptions[1] {
+				r.WeekendPolicy = "skip"
+			}
 		case "weekly":
 			for i, n := range dowNames {
 				if n == dowSelect.Selected {
@@ -261,7 +295,7 @@ func showRecurringItemsDialog(a fyne.App, parent fyne.Window) {
 	content := container.NewVBox(
 		helpLine,
 		entryRow,
-		container.NewHBox(cadenceSelect, dowSelect, domWrapper),
+		container.NewHBox(cadenceSelect, weekendSelect, dowSelect, domWrapper),
 		widget.NewSeparator(),
 		itemsBox,
 	)

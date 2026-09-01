@@ -564,7 +564,18 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		for _, cat := range cats {
 			reflectionsBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
 			for _, item := range grouped[cat] {
-				reflectionsBox.Add(widget.NewLabel("- " + item.Text))
+				item := item // capture
+				row := container.NewBorder(nil, nil, nil,
+					newHoverButton("✏️", "Edit", func() {
+						showEditItemDialog(w4, item, func() {
+							fyne.Do(func() {
+								refreshReflections()
+								itemsAccordion.Refresh()
+							})
+						})
+					}),
+					widget.NewLabel("- "+item.Text))
+				reflectionsBox.Add(row)
 			}
 		}
 		reflectionsBox.Refresh()

@@ -69,9 +69,13 @@ func showSOMWindow(a fyne.App) {
 
 	w := a.NewWindow("Dunzo: Start of Month")
 
-	// Step 1: digest
-	digestLabel := widget.NewLabel("Generating prior month's digest, please wait...")
-	digestLabel.Wrapping = fyne.TextWrapWord
+	// Step 1: digest -- rendered as markdown (widget.RichText, same
+	// approach as EOD's summary preview) rather than a plain Label,
+	// since the AI-drafted digest often comes back with markdown
+	// (headers/bold/lists) that reads as literal "**bold**" text
+	// otherwise.
+	digestBody := widget.NewRichTextFromMarkdown("Generating prior month's digest, please wait...")
+	digestBody.Wrapping = fyne.TextWrapWord
 	go func() {
 		ledgerText := gatherLedgerTextForRange(from, to, nil)
 		var summary string
@@ -86,7 +90,7 @@ func showSOMWindow(a fyne.App) {
 			}
 		}
 		fyne.Do(func() {
-			digestLabel.SetText(summary)
+			digestBody.ParseMarkdown(summary)
 		})
 	}()
 
@@ -179,7 +183,7 @@ func showSOMWindow(a fyne.App) {
 
 	content := container.NewVBox(
 		widget.NewLabelWithStyle("1. Last Month's Digest", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		digestLabel,
+		digestBody,
 		widget.NewLabelWithStyle("2. Review IDEA/SOMEDAY Items", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		triageBox,
 		widget.NewLabelWithStyle("3. IMPACT / MILESTONE This Month", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
