@@ -313,12 +313,21 @@ rollup lookups).
       `showPeriodReviewWindow`, gated off by default)
 - [x] Year Kickoff + Review (same generic dialogs, gated off by
       default)
+- [ ] **Quarter/Year-specific Kickoff *content*** -- important
+      distinction: Quarter/Year currently reuse the exact same generic
+      dialog as Week (open-items readback + quick-add; themed AI
+      digest + carry-forward for Review). No OKR/theme-setting-style
+      prompts or other content unique to Quarter/Year granularity has
+      been designed or built yet -- this was floated as a follow-up
+      idea but never actually scoped. Still open.
 - [ ] Split SOM into Month Review + Month Kickoff
 - [x] Menu regroup: `Kickoff.../Review...` submenus in `ui.go`, now
       listing all 5 units (Quarter/Year hidden until their Config
-      toggles are enabled -- default off, config.toml-only for now)
-- [ ] Settings-window UI for the 10 toggles + 5 theme defaults
-      (currently config.toml-only)
+      toggles are enabled)
+- [x] Settings-window UI for the 10 toggles + 5 theme defaults
+      (`showSettings` in `settings.go`), with `RebuildTrayMenu()`
+      applying toggle changes to the tray menu immediately, no
+      restart needed
 - [ ] Reconcile Reports menu's "Annual Review..." into `Review... ->
       Year` once Year Review exists
 
