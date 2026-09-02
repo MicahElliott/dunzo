@@ -307,13 +307,14 @@ rollup lookups).
       Brag Preso) + per-unit default + override (`themePromptFraming`,
       `generateThemedReview`; wired into SOM with a theme dropdown)
 - [ ] Pandoc export action
-- [ ] Week Kickoff + Review (new, no prior art)
+- [x] Week Kickoff + Review (`dunnit/weekkickoff.go`,
+      `dunnit/weekreview.go`) -- first tier with no prior art
 - [ ] Quarter Kickoff + Review (new, no prior art)
 - [ ] Year Kickoff + Review (new, no prior art)
 - [ ] Split SOM into Month Review + Month Kickoff
-- [x] Menu regroup: `Kickoff.../Review...` submenus in `ui.go`,
-      currently only listing Day/Month (only units with implemented
-      dialogs); Week/Quarter/Year omitted until their dialogs exist
+- [x] Menu regroup: `Kickoff.../Review...` submenus in `ui.go`, now
+      listing Day/Week/Month; Quarter/Year omitted until their
+      dialogs exist
 - [ ] Settings-window UI for the 10 toggles + 5 theme defaults
       (currently config.toml-only)
 - [ ] Reconcile Reports menu's "Annual Review..." into `Review... ->
