@@ -87,6 +87,11 @@ func showSOMWindow(a fyne.App) {
 	// string, so this is tracked separately.
 	digestText := ""
 	digestSavePath := periodReportPath("som", from, "200601")
+	themeSelect := widget.NewSelect(
+		[]string{ThemePersonalNotes, ThemeStatusReport, ThemeFormalReport, ThemeBragPreso},
+		nil)
+	cfg := LoadConfig()
+	themeSelect.SetSelected(themeFor(cfg, periodMonth))
 	copyDigestBtn := widget.NewButtonWithIcon("Copy", theme.Icon(theme.IconNameContentCopy), func() {
 		a.Clipboard().SetContent(digestText)
 	})
@@ -97,33 +102,32 @@ func showSOMWindow(a fyne.App) {
 		}
 		dialog.ShowInformation("Saved", "Saved to "+digestSavePath, w)
 	})
-	go func() {
-		ledgerText := gatherLedgerTextForRange(from, to, nil)
-		var summary string
-		if strings.TrimSpace(ledgerText) == "" {
-			summary = "(no ledger entries found for last month)"
-		} else {
-			// Framed as "Month Summary" (e.g. "Aug 2026 Summary"),
-			// not summarizeWithCopilot's generic "standup or status
-			// update" framing -- SOM's digest covers a full prior
-			// month, a standup-style summary doesn't fit here.
-			s, err := summarizeWithCopilotPrompt(
-				"Summarize this ledger of a month's daily activity "+
-					"entries into a well-organized month-in-review report, "+
-					"titled \""+from.Format("Jan 2006")+" Summary\". Be "+
-					"concise and group related work together."+
-					reviewLengthConstraint(periodMonth), ledgerText)
+	// generateDigest runs generateThemedReview (period.go) for
+	// periodMonth anchored at from (the prior month, per
+	// priorMonthRange above) using whichever theme is currently
+	// selected in themeSelect -- a per-instance override of cfg's
+	// standing ThemeMonth default, without persisting the change.
+	var generateDigest func()
+	generateDigest = func() {
+		digestBody.ParseMarkdown("*Generating, please wait...*")
+		go func() {
+			overrideCfg := cfg
+			switch themeSelect.Selected {
+			case ThemePersonalNotes, ThemeStatusReport, ThemeFormalReport, ThemeBragPreso:
+				overrideCfg.ThemeMonth = themeSelect.Selected
+			}
+			summary, err := generateThemedReview(overrideCfg, periodMonth, from)
 			if err != nil {
 				summary = "Error running gh copilot:\n" + err.Error()
-			} else {
-				summary = s
 			}
-		}
-		digestText = summary
-		fyne.Do(func() {
-			digestBody.ParseMarkdown(summary)
-		})
-	}()
+			digestText = summary
+			fyne.Do(func() {
+				digestBody.ParseMarkdown(summary)
+			})
+		}()
+	}
+	themeSelect.OnChanged = func(string) { generateDigest() }
+	go generateDigest()
 
 	// Step 2: IDEA/SOMEDAY triage
 	items := gatherIdeaSomedayItems(from, to)
@@ -214,6 +218,7 @@ func showSOMWindow(a fyne.App) {
 
 	content := container.NewVBox(
 		widget.NewLabelWithStyle("1. Last Month's Digest", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		container.NewBorder(nil, nil, widget.NewLabel("Theme:"), nil, themeSelect),
 		digestBody,
 		container.NewHBox(copyDigestBtn, saveDigestBtn),
 		widget.NewLabelWithStyle("2. Review IDEA/SOMEDAY Items", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),

@@ -2,6 +2,7 @@ package dun
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -236,4 +237,87 @@ func reviewLengthConstraint(period summaryPeriod) string {
 	}
 	return fmt.Sprintf(" Keep the total output under roughly %d words; be terse, "+
 		"favor bullet points over prose.", words)
+}
+
+// themePromptFraming returns the instruction text for a Review's
+// copilot prompt, per theme (docs/kickoff-review-design.md's "Three
+// themes" section) -- title is the report's periodLabel-derived
+// title (e.g. "Sep 2026", "Q3 2026 (Jul-Sep)"), unitNoun is the plain
+// English name of the unit being covered (e.g. "day", "week",
+// "month", "quarter", "year") for framing the instruction naturally.
+// Does not include reviewLengthConstraint -- callers append that
+// separately, since it's period-scaled rather than theme-scaled.
+func themePromptFraming(theme string, unitNoun, title string) string {
+	switch theme {
+	case ThemeStatusReport:
+		return fmt.Sprintf(
+			"Summarize this ledger of a %s's activity entries into a "+
+				"status report titled %q, using exactly these section "+
+				"headers (Markdown ##): \"What Happened\", \"What's Next\", "+
+				"\"Blockers\" (omit Blockers if there are none worth "+
+				"mentioning). Neutral, third-person tone, suitable to "+
+				"paste into a team update.", unitNoun, title)
+	case ThemeFormalReport:
+		return fmt.Sprintf(
+			"Summarize this ledger of a %s's activity entries into a "+
+				"formal report titled %q, using exactly these section "+
+				"headers (Markdown ##): \"Summary\", \"Key Accomplishments\", "+
+				"\"Challenges\", \"Goals for Next Period\". Sober, "+
+				"professional tone, written as if for a manager/reviewer "+
+				"audience.", unitNoun, title)
+	case ThemeBragPreso:
+		return fmt.Sprintf(
+			"Summarize this ledger of a %s's activity entries into a "+
+				"slide presentation titled %q, formatted as Pandoc-style "+
+				"Markdown slides: each slide is a level-1 Markdown heading "+
+				"(# Slide Title) followed by a couple of short bullet "+
+				"points, with slides separated by a line containing only "+
+				"\"---\". Each slide should highlight one achievement or "+
+				"notable win, framed for impact. Upbeat tone, minimal text "+
+				"per slide.", unitNoun, title)
+	default: // ThemePersonalNotes, or unrecognized -- fall back to informal
+		return fmt.Sprintf(
+			"Summarize this ledger of a %s's activity entries into "+
+				"brief personal notes titled %q. Informal, first-person, "+
+				"casual tone -- freeform paragraphs or loose bullet points, "+
+				"no fixed section headers needed.", unitNoun, title)
+	}
+}
+
+// unitNoun returns the plain English noun for period ("day", "week",
+// "month", "quarter", "year"), for use in prompt framing text.
+func unitNoun(period summaryPeriod) string {
+	return strings.ToLower(string(period))
+}
+
+// generateThemedReview runs the full themed-Review copilot pipeline
+// for period's unit containing anchor: gathers rollup source material
+// via gatherReviewSourceMaterial (review.go), builds the theme-framed
+// prompt (themePromptFraming + reviewLengthConstraint), and returns
+// the resulting markdown. Returns a placeholder message (nil error)
+// if there's no source material at all to summarize.
+func generateThemedReview(cfg Config, period summaryPeriod, anchor time.Time) (string, error) {
+	from, to := periodDataRange(period, anchor)
+	material := gatherReviewSourceMaterial(period, from, to)
+
+	var combined strings.Builder
+	if len(material.SubReports) > 0 {
+		combined.WriteString("Prior summaries covering parts of this period:\n\n")
+		for _, r := range material.SubReports {
+			combined.WriteString(r)
+			combined.WriteString("\n\n")
+		}
+	}
+	if strings.TrimSpace(material.RawLedger) != "" {
+		combined.WriteString("Additional raw entries not yet summarized:\n\n")
+		combined.WriteString(material.RawLedger)
+	}
+	if strings.TrimSpace(combined.String()) == "" {
+		return fmt.Sprintf("(no entries found for %s)", periodLabel(period, anchor)), nil
+	}
+
+	theme := themeFor(cfg, period)
+	title := periodLabel(period, anchor)
+	instructions := themePromptFraming(theme, unitNoun(period), title) + reviewLengthConstraint(period)
+	return summarizeWithCopilotPrompt(instructions, combined.String())
 }
