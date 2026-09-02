@@ -204,3 +204,36 @@ func themeFor(cfg Config, period summaryPeriod) string {
 	}
 	return periodConfigs[period].DefaultTheme
 }
+
+// reviewLengthWords is the rough target word-count ceiling to instruct
+// the copilot prompt with for each unit's Review, scaled so a Day
+// digest stays tight while a Year digest is allowed more room to
+// cover a full year's worth of rolled-up material. Deliberately a
+// ceiling stated in the prompt itself (not just achieved structurally
+// via the rollup in review.go) -- see docs/kickoff-review-design.md's
+// "Keeping prompts/outputs small" section: structural rollup and
+// explicit prompt instruction are both needed, since rollup alone
+// doesn't stop an LLM from padding its own output with prose.
+var reviewLengthWords = map[summaryPeriod]int{
+	periodDay:     150,
+	periodWeek:    250,
+	periodMonth:   400,
+	periodQuarter: 600,
+	periodYear:    800,
+}
+
+// reviewLengthConstraint returns a short instruction fragment, scaled
+// to period, to append to any Review-generating copilot prompt --
+// e.g. summarizeWithCopilotPrompt(someInstructions+reviewLengthConstraint(periodMonth), ...).
+// Kept as a standalone appendable fragment (not baked into
+// summarizeWithCopilotPrompt itself) so non-Review callers (e.g.
+// Standup's summarizeStandupWithCopilot, which already has its own
+// "Be concise" framing) aren't forced to adopt it.
+func reviewLengthConstraint(period summaryPeriod) string {
+	words, ok := reviewLengthWords[period]
+	if !ok {
+		words = 300
+	}
+	return fmt.Sprintf(" Keep the total output under roughly %d words; be terse, "+
+		"favor bullet points over prose.", words)
+}

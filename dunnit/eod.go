@@ -146,7 +146,11 @@ func showEODWindow(a fyne.App) {
 		if strings.TrimSpace(ledgerText) == "" {
 			return
 		}
-		draft, err := summarizeWithCopilot(ledgerText)
+		draft, err := summarizeWithCopilotPrompt(
+			"Summarize this ledger of a day's activity entries into "+
+				"a brief impact report suitable for a personal end-of-day "+
+				"recap. Be concise and group related work together."+
+				reviewLengthConstraint(periodDay), ledgerText)
 		fyne.Do(func() {
 			if err != nil {
 				log.Println("Error drafting EOD summary:", err)

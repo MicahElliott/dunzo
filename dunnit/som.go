@@ -111,7 +111,8 @@ func showSOMWindow(a fyne.App) {
 				"Summarize this ledger of a month's daily activity "+
 					"entries into a well-organized month-in-review report, "+
 					"titled \""+from.Format("Jan 2006")+" Summary\". Be "+
-					"concise and group related work together.", ledgerText)
+					"concise and group related work together."+
+					reviewLengthConstraint(periodMonth), ledgerText)
 			if err != nil {
 				summary = "Error running gh copilot:\n" + err.Error()
 			} else {
