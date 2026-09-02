@@ -103,6 +103,7 @@ func parseLedgerLineTime(line string, date time.Time) (t time.Time, ok bool) {
 func gatherStandupLines(cfg Config, now time.Time) []string {
 	since := standupWindowStart(cfg, now)
 	dates := append(append([]time.Time{}, standupSourceDates(now)...), now)
+	excludeTags := LoadConfig().ReportExcludeTags
 
 	seen := make(map[string]bool)
 	var out []string
@@ -114,6 +115,9 @@ func gatherStandupLines(cfg Config, now time.Time) []string {
 		for _, line := range readLedgerLinesFrom(path) {
 			cat, text, ok := parseLedgerLine(line)
 			if !ok || !standupCategories[cat] {
+				continue
+			}
+			if lineHasExcludedTag(line, excludeTags) {
 				continue
 			}
 			ts, ok := parseLedgerLineTime(line, date)

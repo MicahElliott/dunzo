@@ -131,8 +131,15 @@ func gatherLedgerTextForRange(from, to time.Time, categories map[string]bool) st
 }
 
 // concatLedgerFiles concatenates the content of the given ledger
-// files into one string (file path headers included, for context).
+// files into one string (file path headers included, for context),
+// skipping any line matching one of Config.ReportExcludeTags (see
+// lineHasExcludedTag) -- applied here, the lowest-level shared
+// concatenation helper, so every report/summary pipeline (Standup,
+// Status Report, Annual Review, Trend View, Kickoff/Review digests,
+// etc) gets the exclusion applied uniformly without each caller
+// needing its own filtering logic.
 func concatLedgerFiles(files []string) string {
+	excludeTags := LoadConfig().ReportExcludeTags
 	var sb strings.Builder
 	for _, path := range files {
 		f, err := os.Open(path)
@@ -142,7 +149,11 @@ func concatLedgerFiles(files []string) string {
 		sb.WriteString("# " + filepath.Base(path) + "\n")
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
-			sb.WriteString(scanner.Text())
+			line := scanner.Text()
+			if lineHasExcludedTag(line, excludeTags) {
+				continue
+			}
+			sb.WriteString(line)
 			sb.WriteString("\n")
 		}
 		f.Close()
@@ -150,9 +161,35 @@ func concatLedgerFiles(files []string) string {
 	return sb.String()
 }
 
+// lineHasExcludedTag reports whether line contains any of
+// excludeTags (each an exact "#tag" token, matched the same way tags
+// are matched everywhere else -- see extractTags).
+func lineHasExcludedTag(line string, excludeTags []string) bool {
+	if len(excludeTags) == 0 {
+		return false
+	}
+	tags := extractTags(line)
+	if len(tags) == 0 {
+		return false
+	}
+	excluded := make(map[string]bool, len(excludeTags))
+	for _, t := range excludeTags {
+		excluded[t] = true
+	}
+	for _, t := range tags {
+		if excluded[t] {
+			return true
+		}
+	}
+	return false
+}
+
 // concatLedgerFilesFiltered is like concatLedgerFiles, but only
-// includes lines whose category is in categories.
+// includes lines whose category is in categories (and, same as
+// concatLedgerFiles, still skips any line matching a
+// Config.ReportExcludeTags tag).
 func concatLedgerFilesFiltered(files []string, categories map[string]bool) string {
+	excludeTags := LoadConfig().ReportExcludeTags
 	var sb strings.Builder
 	for _, path := range files {
 		f, err := os.Open(path)
@@ -165,6 +202,9 @@ func concatLedgerFilesFiltered(files []string, categories map[string]bool) strin
 			line := scanner.Text()
 			cat, _, ok := parseLedgerLine(line)
 			if !ok || !categories[cat] {
+				continue
+			}
+			if lineHasExcludedTag(line, excludeTags) {
 				continue
 			}
 			if !wroteHeader {

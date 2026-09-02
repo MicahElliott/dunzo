@@ -128,6 +128,38 @@ type Config struct {
 	// weekend ledger entry is never silently excluded from a Week
 	// Review just because the label says "Mon-Fri".
 	ExtendWorkWeekTo7Days bool `toml:"extend_work_week_to_7_days"`
+
+	// EnableOKRs gates the Objective/Key-Result modules added to
+	// Quarter/Year Kickoff (goal entry) and Review (status scoring) --
+	// see docs/kickoff-review-design.md's OKR design. Default false
+	// (opt-in): someone who doesn't do formal OKR-style planning
+	// never sees these extra sections.
+	EnableOKRs bool `toml:"enable_okrs"`
+
+	// FavoriteCategories is a user-chosen list of category codes
+	// forming an additional "Faves" quick-filter bucket in Daybook's
+	// category picker, alongside the fixed Now/Plan/Reflect groups
+	// (see categories.go's Group field) -- unlike those, Faves is
+	// entirely user-defined and can mix codes from any group. When
+	// non-empty, Faves is the picker's default-active filter shown
+	// each time Daybook pops up (replacing "whatever group was last
+	// used"), rather than just another option to pick. Default seed:
+	// DONE/TODO/IDEA/FIXME/MEETING (Micah's stated preference,
+	// 2026-09-02) -- edit via Settings to change.
+	FavoriteCategories []string `toml:"favorite_categories"`
+
+	// ReportExcludeTags is a list of "#tag" strings; any ledger line
+	// containing one of these tags is excluded from every report/
+	// summary generation pipeline (Kickoff/Review digests, Standup,
+	// Status Report, Annual Review, Trend View, etc) -- the goal is
+	// keeping non-work items (personal errands, etc) out of work-
+	// facing reports without needing to keep them out of the ledger
+	// itself. Default seed: #home/#personal/#buy/#shop (Micah's
+	// stated preference, 2026-09-02) -- edit via Settings to change.
+	// Entries are matched as exact #tag tokens (see extractTags),
+	// case-sensitive, same as tags are written/matched everywhere
+	// else in this codebase.
+	ReportExcludeTags []string `toml:"report_exclude_tags"`
 }
 
 // defaultConfig mirrors the values from dunnit's config-example.zsh.
@@ -160,6 +192,9 @@ func defaultConfig() Config {
 		ThemeMonth:   ThemeStatusReport,
 		ThemeQuarter: ThemeFormalReport,
 		ThemeYear:    ThemeFormalReport,
+
+		FavoriteCategories: []string{"DONE", "TODO", "IDEA", "FIXME", "MEETING"},
+		ReportExcludeTags:  []string{"#home", "#personal", "#buy", "#shop"},
 	}
 }
 

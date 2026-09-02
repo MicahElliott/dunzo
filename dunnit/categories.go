@@ -89,9 +89,11 @@ var Categories = []Category{
 	// -- it's future-facing/not-yet-actioned just like SOMEDAY, and
 	// som.go's step 2 already treats IDEA/SOMEDAY as a matched pair
 	// for triage, so grouping them together in the picker too keeps
-	// that pairing consistent.
-	{"💡", "IDEA", "A new idea worth capturing.", "plan", "", false},
+	// that pairing consistent. TODO leads the group (2026-09-02,
+	// moved ahead of IDEA per explicit request) since it's the most
+	// common/actionable item in this group.
 	{"📌", "TODO", "A small, tight, near-term item -- actively encouraged.", "plan", "", false},
+	{"💡", "IDEA", "A new idea worth capturing.", "plan", "", false},
 	{"🎯", "GOAL", "A bigger overarching aim, reviewed on a longer cadence (not daily).", "plan", "", false},
 	{"❓", "QUESTION", "An open question to follow up on.", "plan", "", false},
 	{"⏳", "WAITING", "Blocked on someone/something else; not actionable right now.", "plan", "", false},
@@ -142,6 +144,30 @@ func CategoryLabelsForGroup(group string) []string {
 		if group == "" || group == "all" || c.Group == group {
 			labels = append(labels, c.Label())
 		}
+	}
+	return labels
+}
+
+// CategoryLabelsForFaves returns Label() strings for the user's
+// configured "Faves" bucket (Config.FavoriteCategories, a freely
+// user-chosen set of category codes -- unlike Now/Plan/Reflect, which
+// are Categories' own fixed Group field, Faves is entirely
+// user-defined and can mix codes across groups, e.g. the suggested
+// default DONE/TODO/IDEA/FIXME/MEETING). Preserves Categories' overall
+// order (not the order codes were added to the config) and silently
+// skips any code that isn't a real/current category (e.g. after a
+// category is ever renamed/removed) or is EODOnly.
+func CategoryLabelsForFaves(cfg Config) []string {
+	want := make(map[string]bool, len(cfg.FavoriteCategories))
+	for _, code := range cfg.FavoriteCategories {
+		want[code] = true
+	}
+	var labels []string
+	for _, c := range Categories {
+		if c.EODOnly || !want[c.Code] {
+			continue
+		}
+		labels = append(labels, c.Label())
 	}
 	return labels
 }
