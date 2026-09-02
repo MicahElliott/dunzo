@@ -17,11 +17,11 @@ import (
 	"runtime"
 	"strconv"
 
+	"bufio"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"strings"
-	"bufio"
 )
 
 // Get today's ledger file path and name.
@@ -32,7 +32,7 @@ func getLedger() (string, string) {
 	tn := time.Now()
 	yr8 := tn.Format("20060102")
 	moname := t.Format("Jan")
-	fname0 := "ledger-"+yr8+".txt"
+	fname0 := "ledger-" + yr8 + ".txt"
 	fpath := filepath.Join(DunzoDir(),
 		strconv.Itoa(yr), "w"+strconv.Itoa(wk)+"-"+moname)
 	fname := filepath.Join(fpath, fname0)
@@ -65,6 +65,21 @@ func LastActivityAt() time.Time {
 // menu's "Show") can request keyboard focus land there directly,
 // rather than wherever focus happened to be left (or nowhere).
 var mainInputEntry *closeShortcutEntry
+
+// trayApp/trayWindow cache BuildMainWindow's fyne.App/main-window
+// references so RebuildTrayMenu (called after Settings saves a
+// changed Kickoff/Review toggle) can rebuild+reapply the tray menu
+// without needing BuildMainWindow itself to be re-run. Set once by
+// BuildMainWindow; nil until then (RebuildTrayMenu no-ops if so).
+var trayApp fyne.App
+var trayWindow fyne.Window
+
+// trayRefreshAll refreshes Daybook's open/completed/reflections/last-
+// done sections -- set once by BuildMainWindow (which owns the actual
+// refreshX closures, scoped to its own widget state), called by
+// buildTrayMenu's "Show" item. nil-checked before use since it isn't
+// set until BuildMainWindow has run.
+var trayRefreshAll func()
 
 // FocusMainInput requests keyboard focus on Daybook's main entry box,
 // if it's been built yet. Safe to call even before BuildMainWindow
@@ -135,7 +150,8 @@ func recordActivity(text, category string) {
 	fpath, fname := getLedger()
 	if _, err := os.Stat(fpath); os.IsNotExist(err) {
 		log.Println("Making new dir:", fpath)
-		os.MkdirAll(fpath, os.ModePerm) }
+		os.MkdirAll(fpath, os.ModePerm)
+	}
 	f, err := os.OpenFile(fname, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Println("Error opening ledger:", err)
@@ -405,7 +421,8 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// forking/reimplementing Select's renderer. Not worth that cost
 	// for a cosmetic detail; left in the default font.
 	category := widget.NewSelect(CategoryLabelsForGroup("now"),
-		func(cat string) { fmt.Println("saw a category:", cat)
+		func(cat string) {
+			fmt.Println("saw a category:", cat)
 			res := strings.Split(cat, " ")
 			// selectedCat = cat
 			selectedCat = res[1]
@@ -452,8 +469,8 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// so it can be collapsed out of the way once reviewed.
 	openItemsBox := container.NewVBox()
 	var refreshOpenItems func()
-	var refreshCompleted func()   // forward decl -- used inside refreshOpenItems's Done button, defined below
-	var refreshLastDone func()    // forward decl -- used inside refreshOpenItems's Done button and saveEntry, defined further below (needs lastDoneLabel)
+	var refreshCompleted func()          // forward decl -- used inside refreshOpenItems's Done button, defined below
+	var refreshLastDone func()           // forward decl -- used inside refreshOpenItems's Done button and saveEntry, defined further below (needs lastDoneLabel)
 	var itemsAccordion *widget.Accordion // forward decl -- used inside refreshOpenItems's Done/Postpone/Discard buttons, defined below
 	// showAllPlanned toggles whether Planned's non-TODO categories
 	// (GOAL/WAITING/QUESTION/FIXME/RISK) are shown -- default false
@@ -756,176 +773,209 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 	// Menu
 	if desk, ok := a.(desktop.App); ok {
-		meetingsMenu := fyne.NewMenu("Meetings",
-			fyne.NewMenuItem("Meeting Prep...", func() { showMeetingPrepDialog(a) }),
-			fyne.NewMenuItem("Post-Meeting Capture...", func() { showPostMeetingCapture(a, "") }),
-			fyne.NewMenuItem("Standup Summary...", func() { showStandupExport(a) }),
-			fyne.NewMenuItem("Recurring Meetings...", func() {
-				showMiniCalendarDialog(a, w4)
-			}),
-		)
-		meetingsItem := fyne.NewMenuItem("Meetings", nil)
-		meetingsItem.ChildMenu = meetingsMenu
-
-		reportsMenu := fyne.NewMenu("Reports",
-			fyne.NewMenuItem("Summarize...", func() { showSummarizeDialog(a) }),
-			fyne.NewMenuItem("Standup Summary...", func() { showStandupExport(a) }),
-			fyne.NewMenuItem("Status Report...", func() { showStatusReportDialog(a) }),
-			fyne.NewMenuItem("Annual Review...", func() { showAnnualReviewDialog(a) }),
-			fyne.NewMenuItem("Trend View...", func() { showTrendView(a) }),
-		)
-		reportsItem := fyne.NewMenuItem("Reports", nil)
-		reportsItem.ChildMenu = reportsMenu
-
-		// Kickoff.../Review... submenus (docs/kickoff-review-design.md),
-		// replacing the old flat Start of Day/End of Day/Start of
-		// Month items. Day and Month keep their existing bespoke
-		// dialogs (SOD/EOD/SOM); Week/Quarter/Year route through the
-		// generic showPeriodKickoffWindow/showPeriodReviewWindow
-		// (periodkickoff.go/periodreview.go), which have no bespoke
-		// dialog of their own since their shape is identical. Each
-		// included item is gated by its own kickoffEnabled/
-		// reviewEnabled Config toggle, re-read fresh each time the
-		// menu is (re)built via BuildMainWindow -- Quarter/Year
-		// default off (see Config's doc comment), so they won't
-		// appear until explicitly enabled.
-		cfg := LoadConfig()
-		var kickoffItems, reviewItems []*fyne.MenuItem
-		if kickoffEnabled(cfg, periodDay) {
-			kickoffItems = append(kickoffItems, fyne.NewMenuItem("Day...", func() { showSODWindow(a) }))
+		trayApp = a
+		trayWindow = w4
+		trayRefreshAll = func() {
+			refreshOpenItems()
+			refreshCompleted()
+			refreshReflections()
+			refreshLastDone()
 		}
-		if kickoffEnabled(cfg, periodWeek) {
-			kickoffItems = append(kickoffItems, fyne.NewMenuItem("Week...", func() { showPeriodKickoffWindow(a, periodWeek) }))
-		}
-		if kickoffEnabled(cfg, periodMonth) {
-			kickoffItems = append(kickoffItems, fyne.NewMenuItem("Month...", func() { showSOMWindow(a) }))
-		}
-		if kickoffEnabled(cfg, periodQuarter) {
-			kickoffItems = append(kickoffItems, fyne.NewMenuItem("Quarter...", func() { showPeriodKickoffWindow(a, periodQuarter) }))
-		}
-		if kickoffEnabled(cfg, periodYear) {
-			kickoffItems = append(kickoffItems, fyne.NewMenuItem("Year...", func() { showPeriodKickoffWindow(a, periodYear) }))
-		}
-		if reviewEnabled(cfg, periodDay) {
-			reviewItems = append(reviewItems, fyne.NewMenuItem("Day...", func() { showEODWindow(a) }))
-		}
-		if reviewEnabled(cfg, periodWeek) {
-			reviewItems = append(reviewItems, fyne.NewMenuItem("Week...", func() { showPeriodReviewWindow(a, periodWeek) }))
-		}
-		// Month's Review is currently folded into showSOMWindow
-		// (SOM does both prior-month review and new-month kickoff in
-		// one wizard -- see docs/kickoff-review-design.md's "Scope
-		// note" section) -- until that's split, Month's Review item
-		// just opens the same SOM window as Month's Kickoff.
-		if reviewEnabled(cfg, periodMonth) {
-			reviewItems = append(reviewItems, fyne.NewMenuItem("Month...", func() { showSOMWindow(a) }))
-		}
-		if reviewEnabled(cfg, periodQuarter) {
-			reviewItems = append(reviewItems, fyne.NewMenuItem("Quarter...", func() { showPeriodReviewWindow(a, periodQuarter) }))
-		}
-		if reviewEnabled(cfg, periodYear) {
-			reviewItems = append(reviewItems, fyne.NewMenuItem("Year...", func() { showPeriodReviewWindow(a, periodYear) }))
-		}
-		kickoffItem := fyne.NewMenuItem("Kickoff", nil)
-		kickoffItem.ChildMenu = fyne.NewMenu("Kickoff", kickoffItems...)
-		reviewItem := fyne.NewMenuItem("Review", nil)
-		reviewItem.ChildMenu = fyne.NewMenu("Review", reviewItems...)
-
-		ledgerMenu := fyne.NewMenu("Ledger",
-			fyne.NewMenuItem("Show Today's Ledger...", func() {
-				w3 := a.NewWindow("Dunzo: Today")
-				w3.SetContent(widget.NewLabel(strings.Join(readLedgerLines(), "\n")))
-				w3.Resize(fyne.NewSize(500, 400))
-				w3.Show()
-			}),
-			fyne.NewMenuItem("Edit Today's Ledger...", func() {
-				_, fname := getLedger()
-				openInEditor(fname)
-			}),
-			fyne.NewMenuItem("Undo/Edit Last Entry...", func() {
-				showUndoEditLastEntry(a, func() {
-					refreshOpenItems()
-					refreshCompleted()
-					refreshReflections()
-					refreshLastDone()
-				})
-			}),
-			fyne.NewMenuItem("Search...", func() { showSearchDialog(a) }),
-			fyne.NewMenuItem("Recurring Items...", func() {
-				showRecurringItemsDialog(a, w4)
-			}),
-			fyne.NewMenuItem("Daily Summary Doc...", func() {
-				go func() {
-					path, _, err := ensureDailySummaryDoc(time.Now())
-					if err != nil {
-						log.Println("Error drafting daily summary doc:", err)
-						return
-					}
-					if path != "" {
-						openInEditor(path)
-					}
-				}()
-			}),
-		)
-		ledgerItem := fyne.NewMenuItem("Ledger", nil)
-		ledgerItem.ChildMenu = ledgerMenu
-
-		snoozeMenu := fyne.NewMenu("Snooze",
-			fyne.NewMenuItem("15 min", func() { Snooze(15 * time.Minute) }),
-			fyne.NewMenuItem("30 min", func() { Snooze(30 * time.Minute) }),
-			fyne.NewMenuItem("1 hour", func() { Snooze(60 * time.Minute) }),
-		)
-		snoozeItem := fyne.NewMenuItem("Snooze", func() { Snooze(defaultSnoozeDuration()) })
-		snoozeItem.ChildMenu = snoozeMenu
-
-		var dndItem *fyne.MenuItem
-		var m *fyne.Menu
-		dndItem = fyne.NewMenuItem("Do Not Disturb", func() {
-			on := !dndItem.Checked
-			SetDoNotDisturb(on)
-			dndItem.Checked = on
-			desk.SetSystemTrayMenu(m)
-		})
-		dndItem.Checked = IsDoNotDisturb()
-
-		// Since Daybook is normally hidden and only pops up briefly
-		// (per Micah), the tray menu -- not Daybook -- is the primary
-		// surface for anything that isn't a direct reaction to
-		// Daybook already being on screen. Frequent/time-sensitive
-		// items (Show, Kickoff/Review, Snooze) stay top-level and
-		// un-buried; everything else groups into a submenu by domain
-		// (Meetings/Reports/Ledger) rather than by FR number or
-		// chronology.
-		m = fyne.NewMenu("Dunzo",
-			fyne.NewMenuItem("Show", func() {
-				refreshOpenItems()
-				refreshCompleted()
-				refreshReflections()
-				refreshLastDone()
-				w4.Show()
-				w4.RequestFocus()
-				FocusMainInput()
-			}),
-			fyne.NewMenuItemSeparator(),
-			kickoffItem,
-			reviewItem,
-			snoozeItem,
-			dndItem,
-			fyne.NewMenuItemSeparator(),
-			meetingsItem,
-			reportsItem,
-			ledgerItem,
-			fyne.NewMenuItemSeparator(),
-			fyne.NewMenuItem("Help...", func() { showHelp(a) }),
-			fyne.NewMenuItem("Settings...", func() { showSettings(a) }),
-		)
-		desk.SetSystemTrayMenu(m)
+		desk.SetSystemTrayMenu(buildTrayMenu(a, w4))
 	}
 
 	w4.Show()
 	FocusMainInput()
 
 	return w4
+}
+
+// buildTrayMenu constructs the full tray/system-menu structure for
+// BuildMainWindow's Fyne app+main-window (a, w4) -- factored out so
+// RebuildTrayMenu can call it again after Settings changes a Kickoff/
+// Review toggle, without needing BuildMainWindow itself to re-run.
+func buildTrayMenu(a fyne.App, w4 fyne.Window) *fyne.Menu {
+	desk, ok := a.(desktop.App)
+	if !ok {
+		return nil
+	}
+
+	meetingsMenu := fyne.NewMenu("Meetings",
+		fyne.NewMenuItem("Meeting Prep...", func() { showMeetingPrepDialog(a) }),
+		fyne.NewMenuItem("Post-Meeting Capture...", func() { showPostMeetingCapture(a, "") }),
+		fyne.NewMenuItem("Standup Summary...", func() { showStandupExport(a) }),
+		fyne.NewMenuItem("Recurring Meetings...", func() {
+			showMiniCalendarDialog(a, w4)
+		}),
+	)
+	meetingsItem := fyne.NewMenuItem("Meetings", nil)
+	meetingsItem.ChildMenu = meetingsMenu
+
+	reportsMenu := fyne.NewMenu("Reports",
+		fyne.NewMenuItem("Summarize...", func() { showSummarizeDialog(a) }),
+		fyne.NewMenuItem("Standup Summary...", func() { showStandupExport(a) }),
+		fyne.NewMenuItem("Status Report...", func() { showStatusReportDialog(a) }),
+		fyne.NewMenuItem("Annual Review...", func() { showAnnualReviewDialog(a) }),
+		fyne.NewMenuItem("Trend View...", func() { showTrendView(a) }),
+	)
+	reportsItem := fyne.NewMenuItem("Reports", nil)
+	reportsItem.ChildMenu = reportsMenu
+
+	// Kickoff.../Review... submenus (docs/kickoff-review-design.md),
+	// replacing the old flat Start of Day/End of Day/Start of Month
+	// items. Day and Month keep their existing bespoke dialogs
+	// (SOD/EOD/SOM); Week/Quarter/Year route through the generic
+	// showPeriodKickoffWindow/showPeriodReviewWindow
+	// (periodkickoff.go/periodreview.go), which have no bespoke
+	// dialog of their own since their shape is identical. Each
+	// included item is gated by its own kickoffEnabled/reviewEnabled
+	// Config toggle, re-read fresh each time this function runs --
+	// Quarter/Year default off (see Config's doc comment), so they
+	// won't appear until explicitly enabled via Settings.
+	cfg := LoadConfig()
+	var kickoffItems, reviewItems []*fyne.MenuItem
+	if kickoffEnabled(cfg, periodDay) {
+		kickoffItems = append(kickoffItems, fyne.NewMenuItem("Day...", func() { showSODWindow(a) }))
+	}
+	if kickoffEnabled(cfg, periodWeek) {
+		kickoffItems = append(kickoffItems, fyne.NewMenuItem("Week...", func() { showPeriodKickoffWindow(a, periodWeek) }))
+	}
+	if kickoffEnabled(cfg, periodMonth) {
+		kickoffItems = append(kickoffItems, fyne.NewMenuItem("Month...", func() { showSOMWindow(a) }))
+	}
+	if kickoffEnabled(cfg, periodQuarter) {
+		kickoffItems = append(kickoffItems, fyne.NewMenuItem("Quarter...", func() { showPeriodKickoffWindow(a, periodQuarter) }))
+	}
+	if kickoffEnabled(cfg, periodYear) {
+		kickoffItems = append(kickoffItems, fyne.NewMenuItem("Year...", func() { showPeriodKickoffWindow(a, periodYear) }))
+	}
+	if reviewEnabled(cfg, periodDay) {
+		reviewItems = append(reviewItems, fyne.NewMenuItem("Day...", func() { showEODWindow(a) }))
+	}
+	if reviewEnabled(cfg, periodWeek) {
+		reviewItems = append(reviewItems, fyne.NewMenuItem("Week...", func() { showPeriodReviewWindow(a, periodWeek) }))
+	}
+	// Month's Review is currently folded into showSOMWindow (SOM does
+	// both prior-month review and new-month kickoff in one wizard --
+	// see docs/kickoff-review-design.md's "Scope note" section) --
+	// until that's split, Month's Review item just opens the same
+	// SOM window as Month's Kickoff.
+	if reviewEnabled(cfg, periodMonth) {
+		reviewItems = append(reviewItems, fyne.NewMenuItem("Month...", func() { showSOMWindow(a) }))
+	}
+	if reviewEnabled(cfg, periodQuarter) {
+		reviewItems = append(reviewItems, fyne.NewMenuItem("Quarter...", func() { showPeriodReviewWindow(a, periodQuarter) }))
+	}
+	if reviewEnabled(cfg, periodYear) {
+		reviewItems = append(reviewItems, fyne.NewMenuItem("Year...", func() { showPeriodReviewWindow(a, periodYear) }))
+	}
+	kickoffItem := fyne.NewMenuItem("Kickoff", nil)
+	kickoffItem.ChildMenu = fyne.NewMenu("Kickoff", kickoffItems...)
+	reviewItem := fyne.NewMenuItem("Review", nil)
+	reviewItem.ChildMenu = fyne.NewMenu("Review", reviewItems...)
+
+	ledgerMenu := fyne.NewMenu("Ledger",
+		fyne.NewMenuItem("Show Today's Ledger...", func() {
+			w3 := a.NewWindow("Dunzo: Today")
+			w3.SetContent(widget.NewLabel(strings.Join(readLedgerLines(), "\n")))
+			w3.Resize(fyne.NewSize(500, 400))
+			w3.Show()
+		}),
+		fyne.NewMenuItem("Edit Today's Ledger...", func() {
+			_, fname := getLedger()
+			openInEditor(fname)
+		}),
+		fyne.NewMenuItem("Undo/Edit Last Entry...", func() {
+			showUndoEditLastEntry(a, func() {
+				if trayRefreshAll != nil {
+					trayRefreshAll()
+				}
+			})
+		}),
+		fyne.NewMenuItem("Search...", func() { showSearchDialog(a) }),
+		fyne.NewMenuItem("Recurring Items...", func() {
+			showRecurringItemsDialog(a, w4)
+		}),
+		fyne.NewMenuItem("Daily Summary Doc...", func() {
+			go func() {
+				path, _, err := ensureDailySummaryDoc(time.Now())
+				if err != nil {
+					log.Println("Error drafting daily summary doc:", err)
+					return
+				}
+				if path != "" {
+					openInEditor(path)
+				}
+			}()
+		}),
+	)
+	ledgerItem := fyne.NewMenuItem("Ledger", nil)
+	ledgerItem.ChildMenu = ledgerMenu
+
+	snoozeMenu := fyne.NewMenu("Snooze",
+		fyne.NewMenuItem("15 min", func() { Snooze(15 * time.Minute) }),
+		fyne.NewMenuItem("30 min", func() { Snooze(30 * time.Minute) }),
+		fyne.NewMenuItem("1 hour", func() { Snooze(60 * time.Minute) }),
+	)
+	snoozeItem := fyne.NewMenuItem("Snooze", func() { Snooze(defaultSnoozeDuration()) })
+	snoozeItem.ChildMenu = snoozeMenu
+
+	var dndItem *fyne.MenuItem
+	var m *fyne.Menu
+	dndItem = fyne.NewMenuItem("Do Not Disturb", func() {
+		on := !dndItem.Checked
+		SetDoNotDisturb(on)
+		dndItem.Checked = on
+		desk.SetSystemTrayMenu(m)
+	})
+	dndItem.Checked = IsDoNotDisturb()
+
+	// Since Daybook is normally hidden and only pops up briefly (per
+	// Micah), the tray menu -- not Daybook -- is the primary surface
+	// for anything that isn't a direct reaction to Daybook already
+	// being on screen. Frequent/time-sensitive items (Show, Kickoff/
+	// Review, Snooze) stay top-level and un-buried; everything else
+	// groups into a submenu by domain (Meetings/Reports/Ledger)
+	// rather than by FR number or chronology.
+	m = fyne.NewMenu("Dunzo",
+		fyne.NewMenuItem("Show", func() {
+			if trayRefreshAll != nil {
+				trayRefreshAll()
+			}
+			w4.Show()
+			w4.RequestFocus()
+			FocusMainInput()
+		}),
+		fyne.NewMenuItemSeparator(),
+		kickoffItem,
+		reviewItem,
+		snoozeItem,
+		dndItem,
+		fyne.NewMenuItemSeparator(),
+		meetingsItem,
+		reportsItem,
+		ledgerItem,
+		fyne.NewMenuItemSeparator(),
+		fyne.NewMenuItem("Help...", func() { showHelp(a) }),
+		fyne.NewMenuItem("Settings...", func() { showSettings(a) }),
+	)
+	return m
+}
+
+// RebuildTrayMenu re-reads Config and reapplies the tray menu, so a
+// Kickoff/Review toggle changed in Settings (or any other config.toml
+// change affecting menu contents) takes effect immediately rather
+// than requiring an app restart. No-op if BuildMainWindow hasn't run
+// yet (trayApp/trayWindow unset) or the platform has no desktop tray.
+func RebuildTrayMenu() {
+	if trayApp == nil || trayWindow == nil {
+		return
+	}
+	desk, ok := trayApp.(desktop.App)
+	if !ok {
+		return
+	}
+	desk.SetSystemTrayMenu(buildTrayMenu(trayApp, trayWindow))
 }
 
 func updateTime(clock *widget.Label) {

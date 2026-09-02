@@ -48,6 +48,9 @@ func showSettings(a fyne.App) {
 	skipHolidays := widget.NewCheck("", nil)
 	skipHolidays.SetChecked(cfg.SkipUSFederalHolidays)
 
+	extendWorkWeek := widget.NewCheck("", nil)
+	extendWorkWeek.SetChecked(cfg.ExtendWorkWeekTo7Days)
+
 	form := widget.NewForm(
 		widget.NewFormItem("Day Start (HH:MM)", dayStart),
 		widget.NewFormItem("Day End (HH:MM)", dayEnd),
@@ -58,7 +61,40 @@ func showSettings(a fyne.App) {
 		widget.NewFormItem("Auto-draft Daily Summary at EOD", autoDraft),
 		widget.NewFormItem("Default Snooze (minutes)", snoozeMinutes),
 		widget.NewFormItem("Skip US Federal Holidays", skipHolidays),
+		widget.NewFormItem("Extend Work Week to 7 Days", extendWorkWeek),
 	)
+
+	// Kickoff/Review section (docs/kickoff-review-design.md): one
+	// enable-checkbox pair + one theme dropdown per unit. Built as a
+	// second widget.NewForm (rather than folding into the form above)
+	// since it's a visually distinct block of settings; both forms
+	// share the same OnSubmit-driven save via periodToggles below.
+	type unitRow struct {
+		period      summaryPeriod
+		kickoff     *widget.Check
+		review      *widget.Check
+		themeSelect *widget.Select
+	}
+	var unitRows []unitRow
+	for _, p := range []summaryPeriod{periodDay, periodWeek, periodMonth, periodQuarter, periodYear} {
+		kickoffCheck := widget.NewCheck("", nil)
+		kickoffCheck.SetChecked(kickoffEnabled(cfg, p))
+		reviewCheck := widget.NewCheck("", nil)
+		reviewCheck.SetChecked(reviewEnabled(cfg, p))
+		themeSelect := widget.NewSelect(themeOptions(), nil)
+		themeSelect.SetSelected(themeDisplayNames[themeFor(cfg, p)])
+		unitRows = append(unitRows, unitRow{period: p, kickoff: kickoffCheck, review: reviewCheck, themeSelect: themeSelect})
+	}
+	periodItems := []*widget.FormItem{}
+	for _, row := range unitRows {
+		periodItems = append(periodItems,
+			widget.NewFormItem(string(row.period)+" Kickoff", row.kickoff),
+			widget.NewFormItem(string(row.period)+" Review", row.review),
+			widget.NewFormItem(string(row.period)+" Theme", row.themeSelect),
+		)
+	}
+	periodForm := widget.NewForm(periodItems...)
+
 	form.OnSubmit = func() {
 		minutes, err := strconv.Atoi(nudgeInterval.Text)
 		if err != nil {
@@ -83,10 +119,19 @@ func showSettings(a fyne.App) {
 		newCfg.AutoDraftDailySummary = autoDraft.Checked
 		newCfg.SnoozeMinutes = snooze
 		newCfg.SkipUSFederalHolidays = skipHolidays.Checked
+		newCfg.ExtendWorkWeekTo7Days = extendWorkWeek.Checked
+		for _, row := range unitRows {
+			setKickoffEnabled(&newCfg, row.period, row.kickoff.Checked)
+			setReviewEnabled(&newCfg, row.period, row.review.Checked)
+			if theme := themeFromDisplayName(row.themeSelect.Selected); theme != "" {
+				setTheme(&newCfg, row.period, theme)
+			}
+		}
 		if err := writeConfig(newCfg); err != nil {
 			dialog.ShowError(err, w)
 			return
 		}
+		RebuildTrayMenu()
 		w.Close()
 	}
 	form.SubmitText = "Save"
@@ -102,7 +147,10 @@ func showSettings(a fyne.App) {
 		showRecurringItemsDialog(a, w)
 	})
 
-	w.SetContent(container.NewVBox(form, recurringMeetingsBtn, recurringItemsBtn))
-	w.Resize(fyne.NewSize(320, 380))
+	w.SetContent(container.NewVScroll(container.NewVBox(form,
+		widget.NewLabelWithStyle("Kickoff / Review", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		periodForm,
+		recurringMeetingsBtn, recurringItemsBtn)))
+	w.Resize(fyne.NewSize(420, 620))
 	w.Show()
 }

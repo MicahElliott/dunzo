@@ -247,6 +247,39 @@ func reviewEnabled(cfg Config, period summaryPeriod) bool {
 	}
 }
 
+// setKickoffEnabled/setReviewEnabled are the mutating counterparts to
+// kickoffEnabled/reviewEnabled, used by Settings to write back a
+// user's toggle choices per unit.
+func setKickoffEnabled(cfg *Config, period summaryPeriod, value bool) {
+	switch period {
+	case periodDay:
+		cfg.KickoffDayEnabled = value
+	case periodWeek:
+		cfg.KickoffWeekEnabled = value
+	case periodMonth:
+		cfg.KickoffMonthEnabled = value
+	case periodQuarter:
+		cfg.KickoffQuarterEnabled = value
+	case periodYear:
+		cfg.KickoffYearEnabled = value
+	}
+}
+
+func setReviewEnabled(cfg *Config, period summaryPeriod, value bool) {
+	switch period {
+	case periodDay:
+		cfg.ReviewDayEnabled = value
+	case periodWeek:
+		cfg.ReviewWeekEnabled = value
+	case periodMonth:
+		cfg.ReviewMonthEnabled = value
+	case periodQuarter:
+		cfg.ReviewQuarterEnabled = value
+	case periodYear:
+		cfg.ReviewYearEnabled = value
+	}
+}
+
 // themeFor returns cfg's configured default theme for period, falling
 // back to periodConfigs' DefaultTheme if unset (e.g. an older
 // config.toml written before theme fields existed, decoded to "").
