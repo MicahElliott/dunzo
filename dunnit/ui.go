@@ -759,6 +759,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		meetingsMenu := fyne.NewMenu("Meetings",
 			fyne.NewMenuItem("Meeting Prep...", func() { showMeetingPrepDialog(a) }),
 			fyne.NewMenuItem("Post-Meeting Capture...", func() { showPostMeetingCapture(a, "") }),
+			fyne.NewMenuItem("Standup Summary...", func() { showStandupExport(a) }),
 			fyne.NewMenuItem("Recurring Meetings...", func() {
 				showMiniCalendarDialog(a, w4)
 			}),
