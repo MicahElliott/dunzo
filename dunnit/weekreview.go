@@ -109,7 +109,7 @@ func showWeekReviewWindow(a fyne.App) {
 			return
 		}
 		generateBtn.Disable()
-		statusLabel.SetText("Generating, please wait...")
+		statusLabel.SetText("Generating, please wait\u2026")
 		go func() {
 			overrideCfg := cfg
 			overrideCfg.ThemeWeek = selectedTheme
@@ -118,7 +118,7 @@ func showWeekReviewWindow(a fyne.App) {
 				generateBtn.Enable()
 				if err != nil {
 					log.Println("Error generating Week Review:", err)
-					statusLabel.SetText("Error generating report -- see logs.")
+					statusLabel.SetText("Error generating report \u2014 see logs.")
 					dialog.ShowError(err, w)
 					return
 				}

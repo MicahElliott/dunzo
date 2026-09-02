@@ -243,7 +243,7 @@ func showHelp(a fyne.App) {
 			rows.Add(header)
 			lastGroup = c.Group
 		}
-		txt := canvas.NewText(c.Label()+" -- "+c.Help, theme.Color(theme.ColorNameForeground))
+		txt := canvas.NewText(c.Label()+" \u2014 "+c.Help, theme.Color(theme.ColorNameForeground))
 		txt.TextSize = 10
 		txt.TextStyle = fyne.TextStyle{Monospace: true}
 		switch c.Sentiment {
@@ -312,7 +312,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// TODO show day's GOALs
 
 	input := newCloseShortcutEntry(fyne.KeyW, fyne.KeyModifierShortcutDefault, func() { w4.Hide() })
-	input.SetPlaceHolder("Enter text...")
+	input.SetPlaceHolder("Enter text\u2026")
 	mainInputEntry = input
 	// input.Resize(fyne.NewSize(100.0, 50.0))
 
@@ -496,7 +496,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 						})
 					}),
 				),
-				widget.NewLabel("- "+item.Text))
+				widget.NewLabel("\u2022 "+item.Text))
 			openItemsBox.Add(row)
 		}
 		cats, grouped := groupOpenItemsByCategory(items)
@@ -568,7 +568,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 							})
 						})
 					}),
-					widget.NewLabel("- "+item.Text))
+					widget.NewLabel("\u2022 "+item.Text))
 				completedBox.Add(row)
 			}
 		}
@@ -607,7 +607,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 							})
 						})
 					}),
-					widget.NewLabel("- "+item.Text))
+					widget.NewLabel("\u2022 "+item.Text))
 				reflectionsBox.Add(row)
 			}
 		}

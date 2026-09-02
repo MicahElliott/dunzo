@@ -83,5 +83,5 @@ func streakLabel() *widget.Label {
 	if n != 1 {
 		plural = "s"
 	}
-	return widget.NewLabel(fmt.Sprintf("🔥 %d consecutive workday%s logged -- keep it up!", n, plural))
+	return widget.NewLabel(fmt.Sprintf("\U0001F525 %d consecutive workday%s logged \u2014 keep it up!", n, plural))
 }

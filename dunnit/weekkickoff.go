@@ -27,12 +27,12 @@ func showWeekKickoffWindow(a fyne.App) {
 		listBox.RemoveAll()
 		cats, grouped := groupOpenItemsByCategory(getOpenItems())
 		if len(cats) == 0 {
-			listBox.Add(widget.NewLabel("Nothing open right now -- clean slate!"))
+			listBox.Add(widget.NewLabel("Nothing open right now \u2014 clean slate!"))
 		}
 		for _, cat := range cats {
 			listBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
 			for _, item := range grouped[cat] {
-				listBox.Add(widget.NewLabel("- " + item.Text))
+				listBox.Add(widget.NewLabel("\u2022 " + item.Text))
 			}
 		}
 		listBox.Refresh()
@@ -64,7 +64,7 @@ func showWeekKickoffWindow(a fyne.App) {
 	newItemCat := widget.NewSelect(openTrackedCategories, nil)
 	newItemCat.SetSelected("GOAL")
 	newItemText := widget.NewEntry()
-	newItemText.SetPlaceHolder("Add a goal or open item for this week...")
+	newItemText.SetPlaceHolder("Add a goal or open item for this week…")
 	addItem := func() {
 		text := strings.TrimSpace(newItemText.Text)
 		if text == "" {
@@ -80,7 +80,7 @@ func showWeekKickoffWindow(a fyne.App) {
 	entryRow := container.New(newStretchRowLayout(newItemText), newItemCat, newItemText, addBtn)
 
 	content := container.NewVBox(
-		widget.NewLabel("Kicking off "+periodLabel(cfg, periodWeek, now)+" -- here's where things stand:"),
+		widget.NewLabel("Kicking off "+periodLabel(cfg, periodWeek, now)+" \u2014 here\u2019s where things stand:"),
 		listScroll,
 		recurringBox,
 		entryRow,

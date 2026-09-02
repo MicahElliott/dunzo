@@ -94,11 +94,11 @@ func showSettings(a fyne.App) {
 	// Recurring Meetings (FR-15) is its own dialog/config section, but
 	// Settings is a natural place to also reach it from -- both are
 	// "configure how Dunzo behaves" surfaces.
-	recurringMeetingsBtn := widget.NewButton("Recurring Meetings...", func() {
+	recurringMeetingsBtn := widget.NewButton("Recurring Meetings\u2026", func() {
 		showMiniCalendarDialog(a, w)
 	})
 
-	recurringItemsBtn := widget.NewButton("Recurring Items...", func() {
+	recurringItemsBtn := widget.NewButton("Recurring Items\u2026", func() {
 		showRecurringItemsDialog(a, w)
 	})
 

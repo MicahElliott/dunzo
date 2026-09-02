@@ -189,7 +189,7 @@ func showRecurringItemsDialog(a fyne.App, parent fyne.Window) {
 					saveAll()
 					refreshItems()
 				}),
-				widget.NewLabel(r.Category+": "+r.Text+" -- "+detail))
+				widget.NewLabel(r.Category+": "+r.Text+" \u2014 "+detail))
 			itemsBox.Add(row)
 		}
 		itemsBox.Refresh()
@@ -206,7 +206,7 @@ func showRecurringItemsDialog(a fyne.App, parent fyne.Window) {
 	catSelect.SetSelected("TODO")
 
 	textEntry := widget.NewEntry()
-	textEntry.SetPlaceHolder("Item text...")
+	textEntry.SetPlaceHolder("Item text\u2026")
 
 	cadenceSelect := widget.NewSelect(cadenceOptions, nil)
 	cadenceSelect.SetSelected("daily")
@@ -223,7 +223,7 @@ func showRecurringItemsDialog(a fyne.App, parent fyne.Window) {
 	dowSelect.Hide()
 
 	domEntry := widget.NewEntry()
-	domEntry.SetPlaceHolder("1-31")
+	domEntry.SetPlaceHolder("1\u201331")
 	domWrapper := container.NewGridWrap(fyne.NewSize(50, domEntry.MinSize().Height), domEntry)
 	domWrapper.Hide()
 
@@ -268,7 +268,7 @@ func showRecurringItemsDialog(a fyne.App, parent fyne.Window) {
 		case "monthly":
 			day, err := strconv.Atoi(strings.TrimSpace(domEntry.Text))
 			if err != nil || day < 1 || day > 31 {
-				dialog.ShowError(errors.New("day of month must be 1-31"), parent)
+				dialog.ShowError(errors.New("day of month must be 1\u201331"), parent)
 				return
 			}
 			r.DayOfMonth = day

@@ -139,7 +139,7 @@ func showMeetingPrepDialog(a fyne.App) {
 	onlyNewCheck := widget.NewCheck("Only new since last pull", nil)
 
 	history := widget.NewMultiLineEntry()
-	history.SetPlaceHolder("Enter a tag above and click Refresh to pull recent entries...")
+	history.SetPlaceHolder("Enter a tag above and click Refresh to pull recent entries\u2026")
 	history.SetMinRowsVisible(8)
 
 	refreshHistory := func() {
@@ -178,7 +178,7 @@ func showMeetingPrepDialog(a fyne.App) {
 	onlyNewCheck.OnChanged = func(bool) { refreshHistory() }
 
 	noteEntry := widget.NewMultiLineEntry()
-	noteEntry.SetPlaceHolder("New agenda note for this meeting...")
+	noteEntry.SetPlaceHolder("New agenda note for this meeting\u2026")
 	noteEntry.SetMinRowsVisible(3)
 
 	saveNote := func() {
@@ -195,7 +195,7 @@ func showMeetingPrepDialog(a fyne.App) {
 		widget.NewLabel("Meeting Prep"),
 		container.NewBorder(nil, nil, nil, container.NewHBox(catFilterSelect, weeksSelect, refreshBtn), tagEntry),
 		onlyNewCheck,
-		widget.NewLabel("Recent entries for this tag (editable scratch view -- does not alter the ledger):"),
+		widget.NewLabel("Recent entries for this tag (editable scratch view \u2014 does not alter the ledger):"),
 		history,
 		widget.NewLabel("Add a new note:"),
 		noteEntry,

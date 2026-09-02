@@ -48,7 +48,7 @@ func showSearchDialog(a fyne.App) {
 	w := a.NewWindow("Dunzo: Search Ledger History")
 
 	queryEntry := widget.NewEntry()
-	queryEntry.SetPlaceHolder("Search term (tag, category, or keyword)...")
+	queryEntry.SetPlaceHolder("Search term (tag, category, or keyword)\u2026")
 
 	results := widget.NewMultiLineEntry()
 	results.Wrapping = fyne.TextWrapOff

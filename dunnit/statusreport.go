@@ -106,9 +106,9 @@ func runStatusReport(a fyne.App, from, to time.Time, audience string) {
 		return
 	}
 
-	progress := a.NewWindow("Dunzo: Generating Status Report...")
+	progress := a.NewWindow("Dunzo: Generating Status Report\u2026")
 	progress.SetContent(widget.NewLabel(
-		"Asking gh copilot to summarize, please wait...\n" +
+		"Asking gh copilot to summarize, please wait\u2026\n" +
 			"The generated report will be copied to your clipboard automatically."))
 	progress.Show()
 

@@ -138,7 +138,7 @@ func formatStandup(lines []string) string {
 	}
 	var sb strings.Builder
 	for _, l := range lines {
-		sb.WriteString("- ")
+		sb.WriteString("\u2022 ")
 		sb.WriteString(l)
 		sb.WriteString("\n")
 	}
@@ -205,11 +205,11 @@ func showStandupExport(a fyne.App) {
 					hidden[i] = true
 					rebuildItemsBox()
 				}),
-				widget.NewLabel("- "+line))
+				widget.NewLabel("\u2022 "+line))
 			itemsBox.Add(row)
 		}
 		if !anyVisible {
-			itemsBox.Add(widget.NewLabel("(nothing to show -- either no DONE/WIN entries in the covered period, or everything's hidden)"))
+			itemsBox.Add(widget.NewLabel("(nothing to show \u2014 either no DONE/WIN entries in the covered period, or everything\u2019s hidden)"))
 		}
 		itemsBox.Refresh()
 	}
@@ -226,7 +226,7 @@ func showStandupExport(a fyne.App) {
 			dialog.ShowInformation("Nothing to Summarize", "All items are hidden (or there were none to begin with).", w)
 			return
 		}
-		progress := dialog.NewCustomWithoutButtons("Generating Summary", widget.NewLabel("Running gh copilot, please wait..."), w)
+		progress := dialog.NewCustomWithoutButtons("Generating Summary", widget.NewLabel("Running gh copilot, please wait\u2026"), w)
 		progress.Show()
 		go func() {
 			summary, err := summarizeStandupWithCopilot(visible)

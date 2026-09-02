@@ -110,7 +110,7 @@ func periodLabel(cfg Config, period summaryPeriod, anchor time.Time) string {
 		return anchor.Format("Jan 2006")
 	case periodQuarter:
 		q := quarterOf(anchor)
-		monthNames := [4]string{"Jan-Mar", "Apr-Jun", "Jul-Sep", "Oct-Dec"}
+		monthNames := [4]string{"Jan\u2013Mar", "Apr\u2013Jun", "Jul\u2013Sep", "Oct\u2013Dec"}
 		return fmt.Sprintf("Q%d %d (%s)", q, anchor.Year(), monthNames[q-1])
 	case periodYear:
 		return fmt.Sprintf("%d", anchor.Year())
@@ -119,12 +119,13 @@ func periodLabel(cfg Config, period summaryPeriod, anchor time.Time) string {
 	}
 }
 
-// weekLabel returns "Week of <start> - <end> (W<iso week>)" for the
-// week containing anchor -- end is start+4 days (Fri) by default, or
-// start+6 days (Sun) if extend7 is true. If start and end fall in the
-// same month, end is shown as just the day number (e.g. "Sep 7 - 11")
-// rather than repeating the month name; otherwise both months are
-// spelled out (e.g. "Aug 31 - Sep 4").
+// weekLabel returns "Week of <start> – <end> — W<iso week>" for the
+// week containing anchor (en-dash between the date range, em-dash
+// before the week number, no parens) -- end is start+4 days (Fri) by
+// default, or start+6 days (Sun) if extend7 is true. If start and end
+// fall in the same month, end is shown as just the day number (e.g.
+// "Sep 7 – 11") rather than repeating the month name; otherwise both
+// months are spelled out (e.g. "Aug 31 – Sep 4").
 func weekLabel(anchor time.Time, extend7 bool) string {
 	start := weekStart(anchor)
 	lastDayOffset := 4
@@ -136,11 +137,11 @@ func weekLabel(anchor time.Time, extend7 bool) string {
 
 	var rangeText string
 	if start.Month() == end.Month() {
-		rangeText = start.Format("Jan 2") + " - " + end.Format("2")
+		rangeText = start.Format("Jan 2") + " \u2013 " + end.Format("2")
 	} else {
-		rangeText = start.Format("Jan 2") + " - " + end.Format("Jan 2")
+		rangeText = start.Format("Jan 2") + " \u2013 " + end.Format("Jan 2")
 	}
-	return fmt.Sprintf("Week of %s (W%d)", rangeText, isoWeek)
+	return fmt.Sprintf("Week of %s \u2014 W%d", rangeText, isoWeek)
 }
 
 // weekStart returns the Monday (00:00) of the ISO week containing t,

@@ -127,7 +127,7 @@ func showEODWindow(a fyne.App) {
 	// Fyne's built-in widget.NewRichTextFromMarkdown, updating live as
 	// the summary is edited.
 	summary := widget.NewMultiLineEntry()
-	summary.SetPlaceHolder("Generating an AI summary of today, please wait (feel free to edit once it arrives, or type your own now)...")
+	summary.SetPlaceHolder("Generating an AI summary of today, please wait (feel free to edit once it arrives, or type your own now)\u2026")
 	summary.SetMinRowsVisible(10)
 	summaryPreview := widget.NewRichTextFromMarkdown("")
 	summaryPreview.Wrapping = fyne.TextWrapWord
@@ -173,7 +173,7 @@ func showEODWindow(a fyne.App) {
 	sentiment.SetSelected("Neutral")
 
 	goals := widget.NewMultiLineEntry()
-	goals.SetPlaceHolder("Any goals for tomorrow? One per line...")
+	goals.SetPlaceHolder("Any goals for tomorrow? One per line\u2026")
 	goals.SetMinRowsVisible(3)
 
 	// FR-09 (extended): open TODOs and QUESTIONs each get their own
@@ -184,7 +184,7 @@ func showEODWindow(a fyne.App) {
 	items := []*widget.FormItem{
 		widget.NewFormItem("Today's Items", todayScroll),
 		widget.NewFormItem("Summary", summaryBox),
-		widget.NewFormItem("Productivity (1-5)", productivity),
+		widget.NewFormItem("Productivity (1\u20135)", productivity),
 		widget.NewFormItem("Meeting Hours", meetingHours),
 		widget.NewFormItem("Sentiment", sentiment),
 		widget.NewFormItem("Tomorrow's Goals", goals),

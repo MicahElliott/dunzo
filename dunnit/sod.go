@@ -31,12 +31,12 @@ func showSODWindow(a fyne.App) {
 		listBox.RemoveAll()
 		cats, grouped := groupOpenItemsByCategory(getOpenItems())
 		if len(cats) == 0 {
-			listBox.Add(widget.NewLabel("Nothing open right now -- clean slate!"))
+			listBox.Add(widget.NewLabel("Nothing open right now \u2014 clean slate!"))
 		}
 		for _, cat := range cats {
 			listBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
 			for _, item := range grouped[cat] {
-				listBox.Add(widget.NewLabel("- " + item.Text))
+				listBox.Add(widget.NewLabel("\u2022 " + item.Text))
 			}
 		}
 		listBox.Refresh()
@@ -88,7 +88,7 @@ func showSODWindow(a fyne.App) {
 	newItemCat := widget.NewSelect(openTrackedCategories, nil)
 	newItemCat.SetSelected("TODO")
 	newItemText := widget.NewEntry()
-	newItemText.SetPlaceHolder("Add a new open item for today...")
+	newItemText.SetPlaceHolder("Add a new open item for today\u2026")
 
 	// Tag autocomplete (FR-10), same pattern as the main Daybook entry
 	// (ui.go) and Recurring Meetings' tag field (minicalendar.go).
@@ -159,11 +159,11 @@ func showSODWindow(a fyne.App) {
 	// itself is shown/interacted with -- so if Daybook is already
 	// open in the background, it won't reflect these until it's
 	// closed and reopened (or otherwise refreshed).
-	syncNote := widget.NewLabel("Note: new items here will show up in Daybook's Planned section next time it's opened.")
+	syncNote := widget.NewLabel("Note: new items here will show up in Daybook\u2019s Planned section next time it\u2019s opened.")
 	syncNote.Wrapping = fyne.TextWrapWord
 
 	content := container.NewVBox(
-		widget.NewLabel("Good morning! Here's where things stand:"),
+		widget.NewLabel("Good morning! Here\u2019s where things stand:"),
 		streakLabel(),
 		listScroll,
 		copyBtn,

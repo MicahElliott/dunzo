@@ -247,9 +247,9 @@ func runSummarize(a fyne.App, period summaryPeriod) {
 		return
 	}
 
-	progress := a.NewWindow("Dunzo: Summarizing...")
+	progress := a.NewWindow("Dunzo: Summarizing\u2026")
 	progress.SetContent(widget.NewLabel(
-		"Asking gh copilot to summarize, please wait...\n" +
+		"Asking gh copilot to summarize, please wait\u2026\n" +
 			"The generated report will be copied to your clipboard automatically."))
 	progress.Show()
 

@@ -29,7 +29,7 @@ func showPostMeetingCapture(a fyne.App, tag string) {
 	w := a.NewWindow("Dunzo: Post-Meeting Capture")
 
 	tagEntry := widget.NewEntry()
-	tagEntry.SetPlaceHolder("#tag (e.g. #boss) -- entries are grouped under this tag")
+	tagEntry.SetPlaceHolder("#tag (e.g. #boss) \u2014 entries are grouped under this tag")
 	tagEntry.SetText(tag)
 
 	fields := make(map[string]*widget.Entry, len(postMeetingCategories))
@@ -58,7 +58,7 @@ func showPostMeetingCapture(a fyne.App, tag string) {
 	}
 
 	content := container.NewVBox(
-		widget.NewLabel("Post-Meeting Capture -- quick multi-category dump, skip any field:"),
+		widget.NewLabel("Post-Meeting Capture \u2014 quick multi-category dump, skip any field:"),
 		widget.NewForm(formItems...),
 		container.NewHBox(
 			widget.NewButton("Save", save),

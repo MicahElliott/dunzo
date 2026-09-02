@@ -79,7 +79,7 @@ func showSOMWindow(a fyne.App) {
 	// otherwise. Placeholder text is explicit that this is
 	// AI-generated content still loading, not a permanent empty
 	// state.
-	digestBody := widget.NewRichTextFromMarkdown("*An AI-generated summary will show up here shortly...*")
+	digestBody := widget.NewRichTextFromMarkdown("*An AI-generated summary will show up here shortly\u2026*")
 	digestBody.Wrapping = fyne.TextWrapWord
 	// digestText holds the latest plain-text digest (once generated)
 	// for the Copy/Save buttons below -- digestBody itself only
@@ -156,10 +156,10 @@ func showSOMWindow(a fyne.App) {
 
 	// Step 3: IMPACT/MILESTONE prompts
 	impactEntry := widget.NewMultiLineEntry()
-	impactEntry.SetPlaceHolder("Any IMPACT items this month? One per line...")
+	impactEntry.SetPlaceHolder("Any IMPACT items this month? One per line\u2026")
 	impactEntry.SetMinRowsVisible(2)
 	milestoneEntry := widget.NewMultiLineEntry()
-	milestoneEntry.SetPlaceHolder("Any MILESTONE items this month? One per line...")
+	milestoneEntry.SetPlaceHolder("Any MILESTONE items this month? One per line\u2026")
 	milestoneEntry.SetMinRowsVisible(2)
 
 	// Step 4: new month's GOALs
@@ -174,10 +174,10 @@ func showSOMWindow(a fyne.App) {
 		currentGoalsBox.Add(widget.NewLabel("(no current GOALs logged yet)"))
 	}
 	for _, item := range currentGoals {
-		currentGoalsBox.Add(widget.NewLabel("- " + item.Text))
+		currentGoalsBox.Add(widget.NewLabel("\u2022 " + item.Text))
 	}
 	newGoalsEntry := widget.NewMultiLineEntry()
-	newGoalsEntry.SetPlaceHolder("New/updated GOALs for this month? One per line...")
+	newGoalsEntry.SetPlaceHolder("New/updated GOALs for this month? One per line\u2026")
 	newGoalsEntry.SetMinRowsVisible(2)
 
 	// Step 5: monthly recurring items, surfaced as a month checklist

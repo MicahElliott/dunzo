@@ -88,7 +88,7 @@ func showMiniCalendarDialog(a fyne.App, parent fyne.Window) {
 				}
 				detail = dowNames[m.DOW] + " " + m.Time + " (" + every + ")"
 			}
-			o.(*widget.Label).SetText(m.Tag + " -- " + detail)
+			o.(*widget.Label).SetText(m.Tag + " \u2014 " + detail)
 		},
 	)
 
@@ -261,7 +261,7 @@ func showMiniCalendarDialog(a fyne.App, parent fyne.Window) {
 	content := container.NewBorder(
 		container.NewVBox(
 			widget.NewLabel("Recurring Meetings"),
-			widget.NewRichTextFromMarkdown("*Use these tags throughout your weeks any time a meeting topic thought comes to mind. They'll be collected and presented to you just before your meeting starts.*"),
+			widget.NewRichTextFromMarkdown("*Use these tags throughout your weeks any time a meeting topic thought comes to mind. They\u2019ll be collected and presented to you just before your meeting starts.*"),
 			tagEntry,
 			container.NewHBox(cadenceSelect, dowSelect, timeWrapper, intervalLabel, intervalWrapper, weekLabel, weekendSelect, addBtn),
 		),
