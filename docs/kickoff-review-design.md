@@ -307,14 +307,16 @@ rollup lookups).
       Brag Preso) + per-unit default + override (`themePromptFraming`,
       `generateThemedReview`; wired into SOM with a theme dropdown)
 - [ ] Pandoc export action
-- [x] Week Kickoff + Review (`dunnit/weekkickoff.go`,
-      `dunnit/weekreview.go`) -- first tier with no prior art
-- [ ] Quarter Kickoff + Review (new, no prior art)
-- [ ] Year Kickoff + Review (new, no prior art)
+- [x] Week Kickoff + Review (`dunnit/periodkickoff.go`,
+      `dunnit/periodreview.go`) -- first tier with no prior art
+- [x] Quarter Kickoff + Review (generic `showPeriodKickoffWindow`/
+      `showPeriodReviewWindow`, gated off by default)
+- [x] Year Kickoff + Review (same generic dialogs, gated off by
+      default)
 - [ ] Split SOM into Month Review + Month Kickoff
 - [x] Menu regroup: `Kickoff.../Review...` submenus in `ui.go`, now
-      listing Day/Week/Month; Quarter/Year omitted until their
-      dialogs exist
+      listing all 5 units (Quarter/Year hidden until their Config
+      toggles are enabled -- default off, config.toml-only for now)
 - [ ] Settings-window UI for the 10 toggles + 5 theme defaults
       (currently config.toml-only)
 - [ ] Reconcile Reports menu's "Annual Review..." into `Review... ->
@@ -339,3 +341,28 @@ rollup lookups).
    once Year Review is implemented (ad hoc/arbitrary-date-range
    invocation, per last session's point 6, still available -- just
    through the unified Review flow, not a second separate feature).
+
+## Week label format and app-wide typography -- decided 2026-09-02
+
+- **Week label**: `"Week of Aug 31 – Sep 4 — W36"` -- en-dash between
+  the date range, em-dash before the ISO week number, no parens. Same-
+  month weeks collapse the end date to just the day number (`"Week of
+  Sep 7 – 11 — W37"`). Implemented as `weekLabel` in `period.go`, used
+  by `periodLabel(cfg, periodWeek, anchor)`.
+- **`Config.ExtendWorkWeekTo7Days`**: new toggle (default `false` =
+  Mon-Fri 5-day display) switching Week's *label* to the full Mon-Sun
+  7-day span. Display-only -- Week's actual data-gathering range is
+  unaffected either way, so a weekend ledger entry is never excluded
+  from a Week Review just because the label reads "Mon-Fri".
+- **App-wide typography default**: all new user-facing strings (window
+  titles, labels, placeholders, button/dialog text) should use proper
+  typography going forward -- em-dash "—" for sentence dashes, en-dash
+  "–" for numeric/date ranges, curly quotes/apostrophes ("’" not "'"),
+  real bullets "•" instead of "- " list-item prefixes, real ellipsis
+  "…" instead of "...". Applies to UI strings only, not Go comments
+  (which stay plain ASCII, existing repo convention) and not the
+  existing "..." menu-item-suffix convention (e.g. `"Settings..."`,
+  which is a deliberate "opens a dialog" marker, left alone) or "->"
+  arrow glyphs, or Markdown source fed to `ParseMarkdown`/
+  `NewRichTextFromMarkdown` (must stay ASCII to parse). Swept
+  app-wide 2026-09-02 (see git history around that date).
