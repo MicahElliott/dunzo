@@ -279,6 +279,12 @@ func showHelp(a fyne.App) {
 
 func MakeUI() *fyne.App {
 	a := app.New()
+	// Theme is set in BuildMainWindow (which also needs LightTheme's
+	// color scheme, see eod.go's comment) rather than here -- setting
+	// it in both places is harmless (SetTheme just replaces), but
+	// BuildMainWindow is the actual single point of truth so it's
+	// only done there to avoid the two calls silently drifting out of
+	// sync the way they did before (see compactTheme's doc comment).
 	return &a
 }
 
@@ -317,7 +323,8 @@ func (e *closeShortcutEntry) TypedShortcut(shortcut fyne.Shortcut) {
 // yourself after this (see dunnit.go). Returns the window so callers
 // (e.g. the scheduler) can Show()/RequestFocus() it later.
 func BuildMainWindow(a fyne.App) fyne.Window {
-	a.Settings().SetTheme(theme.LightTheme())
+	a.Settings().SetTheme(newCompactTheme())
+	cfg := LoadConfig()
 
 	w4 := a.NewWindow("Dunzo: Daybook")
 	// label1 := widget.NewLabel("Label 1")
@@ -420,26 +427,50 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// do control), this live picker can't be made monospace without
 	// forking/reimplementing Select's renderer. Not worth that cost
 	// for a cosmetic detail; left in the default font.
-	category := widget.NewSelect(CategoryLabelsForGroup("now"),
+	//
+	// defaultGroupFilter/defaultGroupOptions: if cfg.FavoriteCategories
+	// is non-empty, "Faves" is the picker's default-active filter
+	// (replacing "whatever group was last used" -- Micah wants his
+	// chosen bucket active every time Daybook pops up, not sticky
+	// last-used state) and is added to the groupFilter dropdown's
+	// options; otherwise behaves exactly as before (defaults to
+	// "Now", no Faves option shown at all).
+	faves := CategoryLabelsForFaves(cfg)
+	defaultGroupFilter := "Now"
+	defaultGroupOptions := []string{"Now", "Plan", "Reflect", "All"}
+	defaultCategoryOptions := CategoryLabelsForGroup("now")
+	if len(faves) > 0 {
+		defaultGroupFilter = "Faves"
+		defaultGroupOptions = []string{"Faves", "Now", "Plan", "Reflect", "All"}
+		defaultCategoryOptions = faves
+	}
+
+	category := widget.NewSelect(defaultCategoryOptions,
 		func(cat string) {
 			fmt.Println("saw a category:", cat)
 			res := strings.Split(cat, " ")
 			// selectedCat = cat
 			selectedCat = res[1]
 		})
-	category.SetSelected(Categories[0].Label()) // default to DONE
+	category.SetSelected(defaultCategoryOptions[0])
 
 	// groupFilter narrows the category picker to a subset (FR-06
-	// follow-up): "now" (default, day-to-day capture), "plan"
-	// (future-facing), "reflect" (retrospective/EOD-ish), or "all".
-	// Purely a UI convenience over the same Categories list.
-	groupFilter := widget.NewSelect([]string{"Now", "Plan", "Reflect", "All"},
+	// follow-up): "Faves" (user-configured, see
+	// Config.FavoriteCategories -- shown/default only if configured),
+	// "now" (day-to-day capture), "plan" (future-facing), "reflect"
+	// (retrospective/EOD-ish), or "all". Purely a UI convenience over
+	// the same Categories list.
+	groupFilter := widget.NewSelect(defaultGroupOptions,
 		func(g string) {
-			category.Options = CategoryLabelsForGroup(strings.ToLower(g))
+			if g == "Faves" {
+				category.Options = faves
+			} else {
+				category.Options = CategoryLabelsForGroup(strings.ToLower(g))
+			}
 			category.SetSelected(category.Options[0])
 			category.Refresh()
 		})
-	groupFilter.SetSelected("Now")
+	groupFilter.SetSelected(defaultGroupFilter)
 
 	// Dunzo aims to be a mouseless/mouse-optional UI -- keyboard-only
 	// operation should always be possible. IMPORTANT: Fyne's focus
@@ -487,29 +518,49 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			return
 		}
 		addRow := func(item OpenItem) {
+			// Icon-only widget.NewButtonWithIcon (empty label), not
+			// newHoverIconButton -- this Planned section specifically
+			// hit the tooltip-popup click-swallowing bug
+			// hoverbutton.go documents (a click needs two separate
+			// taps to register once the hover tooltip has appeared),
+			// which the existing tapped-forwarding patch there
+			// doesn't fully close. Sidestepping the tooltip-popup
+			// mechanism entirely removes the whole bug class rather
+			// than chasing Fyne's overlay hit-testing further. No
+			// text label and no hover tooltip either (Micah doesn't
+			// want either) -- old labels noted in comments below for
+			// reference.
 			row := container.NewBorder(nil, nil, nil,
 				container.NewHBox(
-					newHoverIconButton(theme.Icon(theme.IconNameContentClear), "Discard", func() {
+					widget.NewButtonWithIcon("", theme.Icon(theme.IconNameContentClear), func() { // "Discard"
 						recordDiscarded(item)
 						fyne.Do(func() {
 							refreshOpenItems()
 							itemsAccordion.Refresh()
 						})
 					}),
-					newHoverIconButton(theme.Icon(theme.IconNameHistory), "Postpone", func() {
+					widget.NewButtonWithIcon("", theme.Icon(theme.IconNameHistory), func() { // "Postpone"
 						recordPostponed(item)
 						fyne.Do(func() {
 							refreshOpenItems()
 							itemsAccordion.Refresh()
 						})
 					}),
-					newHoverIconButton(theme.Icon(theme.IconNameConfirm), "Done", func() {
+					widget.NewButtonWithIcon("", theme.Icon(theme.IconNameConfirm), func() { // "Done"
 						recordConvertedDone(item)
 						fyne.Do(func() {
 							refreshOpenItems()
 							refreshCompleted()
 							refreshLastDone()
 							itemsAccordion.Refresh()
+						})
+					}),
+					widget.NewButtonWithIcon("", theme.Icon(theme.IconNameDocumentCreate), func() { // "Edit"
+						showEditItemDialog(w4, item, func() {
+							fyne.Do(func() {
+								refreshOpenItems()
+								itemsAccordion.Refresh()
+							})
 						})
 					}),
 				),
@@ -576,7 +627,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			for _, item := range grouped[cat] {
 				item := item // capture
 				row := container.NewBorder(nil, nil, nil,
-					newHoverIconButton(theme.Icon(theme.IconNameDocumentCreate), "Edit", func() {
+					widget.NewButtonWithIcon("", theme.Icon(theme.IconNameDocumentCreate), func() { // "Edit"
 						showEditItemDialog(w4, item, func() {
 							fyne.Do(func() {
 								refreshCompleted()
@@ -616,7 +667,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			for _, item := range grouped[cat] {
 				item := item // capture
 				row := container.NewBorder(nil, nil, nil,
-					newHoverIconButton(theme.Icon(theme.IconNameDocumentCreate), "Edit", func() {
+					widget.NewButtonWithIcon("", theme.Icon(theme.IconNameDocumentCreate), func() { // "Edit"
 						showEditItemDialog(w4, item, func() {
 							fyne.Do(func() {
 								refreshReflections()
@@ -823,51 +874,72 @@ func buildTrayMenu(a fyne.App, w4 fyne.Window) *fyne.Menu {
 
 	// Kickoff.../Review... submenus (docs/kickoff-review-design.md),
 	// replacing the old flat Start of Day/End of Day/Start of Month
-	// items. Day and Month keep their existing bespoke dialogs
-	// (SOD/EOD/SOM); Week/Quarter/Year route through the generic
-	// showPeriodKickoffWindow/showPeriodReviewWindow
-	// (periodkickoff.go/periodreview.go), which have no bespoke
-	// dialog of their own since their shape is identical. Each
-	// included item is gated by its own kickoffEnabled/reviewEnabled
-	// Config toggle, re-read fresh each time this function runs --
-	// Quarter/Year default off (see Config's doc comment), so they
-	// won't appear until explicitly enabled via Settings.
+	// items. Day keeps its existing bespoke dialogs (SOD/EOD); Month
+	// has its own dedicated Kickoff/Review windows
+	// (monthkickoff.go/monthreview.go); Week/Quarter/Year route
+	// through the generic showPeriodKickoffWindow/
+	// showPeriodReviewWindow (periodkickoff.go/periodreview.go),
+	// which have no bespoke dialog of their own since their shape is
+	// identical. Each included item is gated by its own
+	// kickoffEnabled/reviewEnabled Config toggle, re-read fresh each
+	// time this function runs -- Quarter/Year default off (see
+	// Config's doc comment), so they won't appear until explicitly
+	// enabled via Settings.
 	cfg := LoadConfig()
 	var kickoffItems, reviewItems []*fyne.MenuItem
 	if kickoffEnabled(cfg, periodDay) {
 		kickoffItems = append(kickoffItems, fyne.NewMenuItem("Day...", func() { showSODWindow(a) }))
 	}
 	if kickoffEnabled(cfg, periodWeek) {
-		kickoffItems = append(kickoffItems, fyne.NewMenuItem("Week...", func() { showPeriodKickoffWindow(a, periodWeek) }))
+		kickoffItems = append(kickoffItems, fyne.NewMenuItem("Week...", func() { showPeriodKickoffWindow(a, periodWeek, time.Now()) }))
 	}
 	if kickoffEnabled(cfg, periodMonth) {
-		kickoffItems = append(kickoffItems, fyne.NewMenuItem("Month...", func() { showSOMWindow(a) }))
+		kickoffItems = append(kickoffItems, fyne.NewMenuItem("Month...", func() { showMonthKickoffWindow(a, time.Now()) }))
 	}
 	if kickoffEnabled(cfg, periodQuarter) {
-		kickoffItems = append(kickoffItems, fyne.NewMenuItem("Quarter...", func() { showPeriodKickoffWindow(a, periodQuarter) }))
+		kickoffItems = append(kickoffItems, fyne.NewMenuItem("Quarter...", func() { showPeriodKickoffWindow(a, periodQuarter, time.Now()) }))
 	}
 	if kickoffEnabled(cfg, periodYear) {
-		kickoffItems = append(kickoffItems, fyne.NewMenuItem("Year...", func() { showPeriodKickoffWindow(a, periodYear) }))
+		kickoffItems = append(kickoffItems, fyne.NewMenuItem("Year...", func() { showPeriodKickoffWindow(a, periodYear, time.Now()) }))
 	}
 	if reviewEnabled(cfg, periodDay) {
 		reviewItems = append(reviewItems, fyne.NewMenuItem("Day...", func() { showEODWindow(a) }))
 	}
+	// Week/Month/Quarter/Year Review all route through
+	// showPeriodPicker first (docs/kickoff-review-design.md's "which
+	// period" fix) rather than hardcoding "the previous period" --
+	// lets the user pick this period (so far), last period, or a
+	// short back-list instead of always landing on the wrong month.
 	if reviewEnabled(cfg, periodWeek) {
-		reviewItems = append(reviewItems, fyne.NewMenuItem("Week...", func() { showPeriodReviewWindow(a, periodWeek) }))
+		reviewItems = append(reviewItems, fyne.NewMenuItem("Week...", func() {
+			showPeriodPicker(a, cfg, periodWeek, func(anchor time.Time) {
+				showPeriodReviewWindow(a, periodWeek, anchor)
+			})
+		}))
 	}
-	// Month's Review is currently folded into showSOMWindow (SOM does
-	// both prior-month review and new-month kickoff in one wizard --
-	// see docs/kickoff-review-design.md's "Scope note" section) --
-	// until that's split, Month's Review item just opens the same
-	// SOM window as Month's Kickoff.
+	// Month's Review and Kickoff are now split (showMonthReviewWindow/
+	// showMonthKickoffWindow), matching the generic Week/Quarter/Year
+	// pattern -- see docs/kickoff-review-design.md's "Scope note".
 	if reviewEnabled(cfg, periodMonth) {
-		reviewItems = append(reviewItems, fyne.NewMenuItem("Month...", func() { showSOMWindow(a) }))
+		reviewItems = append(reviewItems, fyne.NewMenuItem("Month...", func() {
+			showPeriodPicker(a, cfg, periodMonth, func(anchor time.Time) {
+				showMonthReviewWindow(a, anchor)
+			})
+		}))
 	}
 	if reviewEnabled(cfg, periodQuarter) {
-		reviewItems = append(reviewItems, fyne.NewMenuItem("Quarter...", func() { showPeriodReviewWindow(a, periodQuarter) }))
+		reviewItems = append(reviewItems, fyne.NewMenuItem("Quarter...", func() {
+			showPeriodPicker(a, cfg, periodQuarter, func(anchor time.Time) {
+				showPeriodReviewWindow(a, periodQuarter, anchor)
+			})
+		}))
 	}
 	if reviewEnabled(cfg, periodYear) {
-		reviewItems = append(reviewItems, fyne.NewMenuItem("Year...", func() { showPeriodReviewWindow(a, periodYear) }))
+		reviewItems = append(reviewItems, fyne.NewMenuItem("Year...", func() {
+			showPeriodPicker(a, cfg, periodYear, func(anchor time.Time) {
+				showPeriodReviewWindow(a, periodYear, anchor)
+			})
+		}))
 	}
 	kickoffItem := fyne.NewMenuItem("Kickoff", nil)
 	kickoffItem.ChildMenu = fyne.NewMenu("Kickoff", kickoffItems...)

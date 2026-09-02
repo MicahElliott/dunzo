@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -91,6 +92,19 @@ func showEditItemDialog(parent fyne.Window, item OpenItem, onSave func()) {
 		}
 		onSave()
 	}, parent)
+	// Enter submits (same as clicking Save) -- Confirm() runs the
+	// callback above with save=true, same as the Save button.
+	entry.OnSubmitted = func(string) { d.Confirm() }
+	// Esc dismisses (same as clicking Cancel) -- Fyne's CustomConfirm
+	// doesn't wire this by default. Registered on the parent window's
+	// canvas (standard Fyne shortcut pattern) rather than the entry
+	// itself, since Escape isn't a key Entry's own TypedKey handling
+	// reacts to. Fyne doesn't provide a per-dialog "closed" removal
+	// hook for canvas shortcuts, but that's harmless here: the
+	// shortcut just calls Dismiss() on an already-hidden dialog if
+	// triggered again later, a no-op.
+	parent.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyEscape},
+		func(fyne.Shortcut) { d.Dismiss() })
 	// Fyne's default dialog width is quite narrow for a full ledger
 	// line of text -- widen it so longer entries aren't cramped/
 	// wrapped awkwardly while editing.

@@ -9,11 +9,11 @@ type OpenItem struct {
 	Category string // one of openTrackedCategories
 	Text     string
 	// LineIndex is the 0-based index of this item's originating line
-	// within readLedgerLines(), populated by getCategoryGroupItems
-	// for Daybook's inline Edit (pencil) action -- lets
-	// replaceLedgerLineTextAt target the exact line even if other
-	// lines share the same category+text. Left zero (unused) by
-	// getOpenItems/parseOpenItems, which don't need it.
+	// within readLedgerLines(), populated by getCategoryGroupItems and
+	// (as of the Planned/Reflections Edit-button addition)
+	// parseOpenItems/getOpenItems too -- lets replaceLedgerLineTextAt
+	// target the exact line even if other lines share the same
+	// category+text.
 	LineIndex int
 }
 
@@ -76,7 +76,7 @@ func parseOpenItems(lines []string) []OpenItem {
 	var open []OpenItem
 	resolved := make(map[string]bool) // "CATEGORY\x00text" -> true
 
-	for _, line := range lines {
+	for i, line := range lines {
 		cat, text, ok := parseLedgerLine(line)
 		if !ok {
 			continue
@@ -98,7 +98,7 @@ func parseOpenItems(lines []string) []OpenItem {
 			continue
 		}
 		if isOpenTrackedCategory(cat) {
-			open = append(open, OpenItem{Category: cat, Text: text})
+			open = append(open, OpenItem{Category: cat, Text: text, LineIndex: i})
 		}
 	}
 
