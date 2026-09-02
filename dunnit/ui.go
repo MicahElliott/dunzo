@@ -776,6 +776,39 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		reportsItem := fyne.NewMenuItem("Reports", nil)
 		reportsItem.ChildMenu = reportsMenu
 
+		// Kickoff.../Review... submenus (docs/kickoff-review-design.md),
+		// replacing the old flat Start of Day/End of Day/Start of
+		// Month items. Only Day and Month have implemented dialogs so
+		// far (SOD/EOD/SOM) -- Week/Quarter/Year have no dialog yet,
+		// so their items are omitted entirely regardless of their
+		// Config toggle value, rather than showing a placeholder.
+		// Each included item is further gated by its own
+		// kickoffEnabled/reviewEnabled Config toggle, re-read fresh
+		// each time the menu is (re)built via BuildMainWindow.
+		cfg := LoadConfig()
+		var kickoffItems, reviewItems []*fyne.MenuItem
+		if kickoffEnabled(cfg, periodDay) {
+			kickoffItems = append(kickoffItems, fyne.NewMenuItem("Day...", func() { showSODWindow(a) }))
+		}
+		if kickoffEnabled(cfg, periodMonth) {
+			kickoffItems = append(kickoffItems, fyne.NewMenuItem("Month...", func() { showSOMWindow(a) }))
+		}
+		if reviewEnabled(cfg, periodDay) {
+			reviewItems = append(reviewItems, fyne.NewMenuItem("Day...", func() { showEODWindow(a) }))
+		}
+		// Month's Review is currently folded into showSOMWindow
+		// (SOM does both prior-month review and new-month kickoff in
+		// one wizard -- see docs/kickoff-review-design.md's "Scope
+		// note" section) -- until that's split, Month's Review item
+		// just opens the same SOM window as Month's Kickoff.
+		if reviewEnabled(cfg, periodMonth) {
+			reviewItems = append(reviewItems, fyne.NewMenuItem("Month...", func() { showSOMWindow(a) }))
+		}
+		kickoffItem := fyne.NewMenuItem("Kickoff", nil)
+		kickoffItem.ChildMenu = fyne.NewMenu("Kickoff", kickoffItems...)
+		reviewItem := fyne.NewMenuItem("Review", nil)
+		reviewItem.ChildMenu = fyne.NewMenu("Review", reviewItems...)
+
 		ledgerMenu := fyne.NewMenu("Ledger",
 			fyne.NewMenuItem("Show Today's Ledger...", func() {
 				w3 := a.NewWindow("Dunzo: Today")
@@ -837,7 +870,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		// (per Micah), the tray menu -- not Daybook -- is the primary
 		// surface for anything that isn't a direct reaction to
 		// Daybook already being on screen. Frequent/time-sensitive
-		// items (Show, SOD/EOD/SOM, Snooze) stay top-level and
+		// items (Show, Kickoff/Review, Snooze) stay top-level and
 		// un-buried; everything else groups into a submenu by domain
 		// (Meetings/Reports/Ledger) rather than by FR number or
 		// chronology.
@@ -852,9 +885,8 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 				FocusMainInput()
 			}),
 			fyne.NewMenuItemSeparator(),
-			fyne.NewMenuItem("Start of Day...", func() { showSODWindow(a) }),
-			fyne.NewMenuItem("End of Day...", func() { showEODWindow(a) }),
-			fyne.NewMenuItem("Start of Month...", func() { showSOMWindow(a) }),
+			kickoffItem,
+			reviewItem,
 			snoozeItem,
 			dndItem,
 			fyne.NewMenuItemSeparator(),
