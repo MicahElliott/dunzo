@@ -2,6 +2,7 @@ package dun
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -10,28 +11,118 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// showPeriodReviewWindow shows a generic Review dialog (docs/kickoff-
-// review-design.md) for period: mostly-automatic, generated on-demand
-// (the user picks a theme first, then taps Generate) via
-// generateThemedReview (period.go), saved via reviewReportPath's
-// convention so a larger unit's Review can roll it up. Also offers
-// TODO/QUESTION carry-forward checkboxes, applied unconditionally on
-// Done regardless of whether a report was ever generated or saved --
-// same never-lose-data guarantee as EOD. Used for Week, Quarter, and
-// Year, which have no bespoke dialog of their own (unlike Day/Month's
-// existing EOD/SOM).
-func showPeriodReviewWindow(a fyne.App, period summaryPeriod) {
-	now := time.Now()
+// okrReviewSection builds the optional OKR-scoring module (docs/
+// kickoff-review-design.md's OKR design) for period's Review --
+// Quarter/Year only, gated by cfg.EnableOKRs. Read-back of each open
+// Key Result plus a status dropdown (defaulted to its current/latest
+// status) and an optional short note; nothing is written until
+// applyFn is called (wired to the Review window's Done button,
+// alongside the existing TODO/QUESTION carry-forward, so OKR scoring
+// follows the same "never lose data, decisions applied on Done"
+// pattern -- see docs/kickoff-review-design.md's Review section).
+// Returns (nil, nil) if not applicable.
+func okrReviewSection(period summaryPeriod, anchor time.Time) (box fyne.CanvasObject, applyFn func()) {
+	if period != periodQuarter && period != periodYear {
+		return nil, nil
+	}
 	cfg := LoadConfig()
-	label := periodLabel(cfg, period, now)
-	w := a.NewWindow("Dunzo: " + string(period) + " Review (" + label + ")")
+	if !cfg.EnableOKRs {
+		return nil, nil
+	}
+	objectives := readObjectives(period, anchor)
+	if len(objectives) == 0 {
+		return nil, nil
+	}
 
-	savePath := reviewReportPath(period, now)
+	type krRow struct {
+		text   string
+		status *widget.Select
+		note   *widget.Entry
+	}
+	var rows []krRow
+	vbox := container.NewVBox(
+		widget.NewLabelWithStyle("Score This Period's Key Results", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+	)
+	for _, o := range objectives {
+		if len(o.KeyResults) == 0 {
+			continue
+		}
+		vbox.Add(widget.NewLabelWithStyle(o.Text, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
+		for _, kr := range o.KeyResults {
+			statusSelect := widget.NewSelect(okrStatusOptions, nil)
+			statusSelect.SetSelected(kr.Status)
+			noteEntry := widget.NewEntry()
+			noteEntry.SetText(kr.Note)
+			noteEntry.SetPlaceHolder("Optional note\u2026")
+			rows = append(rows, krRow{text: kr.Text, status: statusSelect, note: noteEntry})
+			vbox.Add(widget.NewLabel("\u2022 " + kr.Text))
+			vbox.Add(container.New(newStretchRowLayout(noteEntry), statusSelect, noteEntry))
+		}
+	}
+
+	apply := func() {
+		for _, r := range rows {
+			// Only append a new KEYRESULT-STATUS line if the status or
+			// note actually changed from what's already on record, so
+			// re-opening Review without touching anything doesn't spam
+			// the ledger with identical status lines.
+			recordKeyResultStatus(r.text, r.status.Selected, r.note.Text, period, anchor)
+		}
+	}
+	return vbox, apply
+}
+
+// showPeriodReviewWindow shows a generic Review dialog (docs/kickoff-
+// review-design.md) for period's unit containing anchor:
+// mostly-automatic, generated on-demand (the user picks a theme
+// first, then taps Generate) via generateThemedReview (period.go),
+// saved via reviewReportPath's theme-aware naming convention so
+// multiple differently-themed reports can coexist for the same
+// period, and so a larger unit's Review can roll it up. Existing
+// saved reports for this exact period are listed up front (view/
+// reopen), without blocking a fresh Generate alongside them. Also
+// offers TODO/QUESTION carry-forward checkboxes, applied
+// unconditionally on Done regardless of whether a report was ever
+// generated or saved -- same never-lose-data guarantee as EOD. Used
+// for Week, Quarter, and Year, which have no bespoke dialog of their
+// own (unlike Day/Month's existing EOD/Month Review); anchor lets
+// callers (showPeriodPicker) open a period other than "last one",
+// including one still in progress (periodProgressSuffix).
+func showPeriodReviewWindow(a fyne.App, period summaryPeriod, anchor time.Time) {
+	cfg := LoadConfig()
+	label := periodLabel(cfg, period, anchor) + periodProgressSuffix(period, anchor)
+	w := a.NewWindow("Dunzo: " + string(period) + " Review (" + label + ")")
 
 	themeSelect := widget.NewSelect(themeOptions(), nil)
 	themeSelect.SetSelected(themeDisplayNames[themeFor(cfg, period)])
 
 	statusLabel := widget.NewLabel("Pick a theme, then tap Generate.")
+
+	// Existing reports for this exact period, listed up front so
+	// Generate is never the only option -- a user can reopen/view a
+	// prior draft instead of (or in addition to) regenerating.
+	existingBox := container.NewVBox()
+	existingPaths, existingThemes := listReviewReportsForPeriod(period, anchor)
+	if len(existingPaths) > 0 {
+		existingBox.Add(widget.NewLabelWithStyle("Already Saved for "+label, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
+		for i, path := range existingPaths {
+			path, th := path, existingThemes[i]
+			display := themeDisplayNames[th]
+			if display == "" {
+				display = "(untitled)"
+			}
+			existingBox.Add(widget.NewButton("View: "+display, func() {
+				body, err := os.ReadFile(path)
+				if err != nil {
+					dialog.ShowError(err, w)
+					return
+				}
+				showEditableReportWindow(a,
+					"Dunzo: "+string(period)+" Review Report ("+label+")",
+					path, string(body))
+			}))
+		}
+	}
 
 	generateBtn := widget.NewButton("Generate", nil)
 	generateBtn.OnTapped = func() {
@@ -44,7 +135,7 @@ func showPeriodReviewWindow(a fyne.App, period summaryPeriod) {
 		go func() {
 			overrideCfg := cfg
 			setTheme(&overrideCfg, period, selectedTheme)
-			summary, err := generateThemedReview(overrideCfg, period, now)
+			summary, err := generateThemedReview(overrideCfg, period, anchor)
 			fyne.Do(func() {
 				generateBtn.Enable()
 				if err != nil {
@@ -56,7 +147,7 @@ func showPeriodReviewWindow(a fyne.App, period summaryPeriod) {
 				statusLabel.SetText("Generated.")
 				showEditableReportWindow(a,
 					"Dunzo: "+string(period)+" Review Report ("+label+")",
-					savePath, summary)
+					reviewReportPath(period, anchor, selectedTheme), summary)
 			})
 		}()
 	}
@@ -77,6 +168,8 @@ func showPeriodReviewWindow(a fyne.App, period summaryPeriod) {
 		carryForwardBox.Add(questionBox)
 	}
 
+	okrBox, applyOKRs := okrReviewSection(period, anchor)
+
 	doneBtn := widget.NewButton("Done", func() {
 		for i, item := range openTodos {
 			if todoChecks[i].Checked {
@@ -88,6 +181,9 @@ func showPeriodReviewWindow(a fyne.App, period summaryPeriod) {
 				carryForwardItem("QUESTION", item.Text)
 			}
 		}
+		if applyOKRs != nil {
+			applyOKRs()
+		}
 		w.Close()
 	})
 
@@ -95,11 +191,15 @@ func showPeriodReviewWindow(a fyne.App, period summaryPeriod) {
 		widget.NewLabel(string(period)+" Review: "+label),
 		container.NewBorder(nil, nil, widget.NewLabel("Theme:"), generateBtn, themeSelect),
 		statusLabel,
+		existingBox,
 		carryForwardBox,
-		doneBtn,
 	)
+	if okrBox != nil {
+		content.Add(okrBox)
+	}
+	content.Add(doneBtn)
 
 	w.SetContent(container.NewVScroll(content))
-	w.Resize(fyne.NewSize(520, 420))
+	w.Resize(fyne.NewSize(520, 500))
 	w.Show()
 }

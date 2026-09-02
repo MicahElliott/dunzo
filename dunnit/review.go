@@ -17,6 +17,66 @@ func reviewReportKind(period summaryPeriod) string {
 	return "review-" + strings.ToLower(string(period))
 }
 
+// reviewReportPath returns the save path for period's Review report
+// covering the nominal unit containing anchor, themed for theme --
+// e.g. "review-month-202609-status_report.md". Including theme in
+// the filename (added alongside the period-picker/mid-period work,
+// see docs/kickoff-review-design.md) lets multiple differently-themed
+// reports coexist for the same period instead of one overwriting the
+// other, and lets listReviewReportsForPeriod tell them apart.
+func reviewReportPath(period summaryPeriod, anchor time.Time, theme string) string {
+	token := reviewReportDateToken(period, anchor)
+	if theme != "" {
+		token += "-" + theme
+	}
+	return periodReportPathRaw(reviewReportKind(period), token)
+}
+
+// listReviewReportsForPeriod returns the saved Review report paths
+// (with their theme, parsed back out of the filename) whose nominal
+// range exactly matches the unit containing anchor -- used by the
+// period-picker/Review window to show "a report already exists for
+// this period" plus which theme(s), before the user taps Generate
+// again. Unlike listReviewReportsOverlapping (used for the rollup,
+// which intentionally wants loose overlap across sub-tier
+// boundaries), this is an exact match against periodNominalRange
+// since it's answering "does *this specific* period already have a
+// saved report", not "what covers part of this range".
+func listReviewReportsForPeriod(period summaryPeriod, anchor time.Time) (paths []string, themes []string) {
+	pattern := periodReportPathRaw(reviewReportKind(period), "*")
+	matches, _ := filepath.Glob(pattern)
+	prefix := reviewReportKind(period) + "-"
+	wantFrom, wantTo := periodNominalRange(period, anchor)
+	for _, path := range matches {
+		name := strings.TrimSuffix(filepath.Base(path), ".md")
+		rest := strings.TrimPrefix(name, prefix)
+		// rest is "<dateToken>" or "<dateToken>-<theme>" -- theme
+		// names (ThemePersonalNotes etc.) never contain "-" so a
+		// single split on the first "-" after the date token would
+		// be ambiguous for periodQuarter's "2026Q3" token (no dash)
+		// but safe in general; instead, try stripping each known
+		// theme suffix explicitly.
+		token, foundTheme := rest, ""
+		for _, th := range themeDisplayOrder {
+			if suffix := "-" + th; strings.HasSuffix(rest, suffix) {
+				token = strings.TrimSuffix(rest, suffix)
+				foundTheme = th
+				break
+			}
+		}
+		anchorFromToken, ok := reviewReportAnchorFromToken(period, token)
+		if !ok {
+			continue
+		}
+		rFrom, rTo := periodNominalRange(period, anchorFromToken)
+		if rFrom.Equal(wantFrom) && rTo.Equal(wantTo) {
+			paths = append(paths, path)
+			themes = append(themes, foundTheme)
+		}
+	}
+	return paths, themes
+}
+
 // reviewReportDateToken encodes anchor's nominal unit as the filename
 // date component for period's Review report, and reviewReportAnchorFromToken
 // reverses it. Day/Week/Month/Year use plain time-parseable formats;
@@ -73,15 +133,6 @@ func reviewReportAnchorFromToken(period summaryPeriod, token string) (t time.Tim
 	default:
 		return time.Time{}, false
 	}
-}
-
-// reviewReportPath returns the save path for period's Review report
-// covering the nominal unit containing anchor -- built on
-// periodReportPathRaw's shared naming convention (kind + explicit
-// token, since Quarter's token isn't produced via time.Time.Format
-// the way periodReportPath in report.go expects).
-func reviewReportPath(period summaryPeriod, anchor time.Time) string {
-	return periodReportPathRaw(reviewReportKind(period), reviewReportDateToken(period, anchor))
 }
 
 // periodReportPathRaw joins DunzoDir()/<kind>-<token>.md directly,

@@ -25,19 +25,118 @@ func periodRecurringCadence(period summaryPeriod) string {
 	}
 }
 
+// okrKickoffSection builds the optional OKR-entry module (docs/
+// kickoff-review-design.md's OKR design) for period's Kickoff --
+// Quarter/Year only, gated by cfg.EnableOKRs. Returns nil if not
+// applicable, so callers can skip adding it to their layout entirely.
+//
+// Shape: a "Theme for this period" freeform field (FOCUS category,
+// distinct from scored OKRs, no scoring implied), then Objective
+// entry (readback of existing Objectives + Add), and Key-Result entry
+// scoped to whichever Objective was most recently added *this
+// session* -- this sidesteps the adjacency-matching ledger design's
+// one real trap (a KR appended after a later Objective already exists
+// in the ledger would misattach to that later one, since
+// readObjectives associates KR lines to the nearest *preceding*
+// OBJECTIVE line by file order) by simply never offering to attach a
+// KR to anything but the newest Objective.
+func okrKickoffSection(a fyne.App, period summaryPeriod, anchor time.Time) fyne.CanvasObject {
+	if period != periodQuarter && period != periodYear {
+		return nil
+	}
+	cfg := LoadConfig()
+	if !cfg.EnableOKRs {
+		return nil
+	}
+
+	focusEntry := widget.NewEntry()
+	focusEntry.SetText(readFocus(period, anchor))
+	focusEntry.SetPlaceHolder("Theme for this " + strings.ToLower(string(period)) + " (e.g. \u201cConsolidation quarter\u201d)\u2026")
+	saveFocusBtn := widget.NewButton("Save", func() {
+		text := strings.TrimSpace(focusEntry.Text)
+		if text != "" {
+			recordFocus(text, period, anchor)
+		}
+	})
+	focusRow := container.New(newStretchRowLayout(focusEntry), focusEntry, saveFocusBtn)
+
+	objBox := container.NewVBox()
+	var latestObjectiveText string
+	refreshObjectives := func() {
+		objBox.RemoveAll()
+		objectives := readObjectives(period, anchor)
+		if len(objectives) == 0 {
+			objBox.Add(widget.NewLabel("No Objectives set yet for this " + strings.ToLower(string(period)) + "."))
+		}
+		for _, o := range objectives {
+			objBox.Add(widget.NewLabelWithStyle(o.Text, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
+			for _, kr := range o.KeyResults {
+				objBox.Add(widget.NewLabel("\u2022 " + kr.Text))
+			}
+			latestObjectiveText = o.Text
+		}
+		objBox.Refresh()
+	}
+	refreshObjectives()
+
+	newObjEntry := widget.NewEntry()
+	newObjEntry.SetPlaceHolder("New Objective\u2026")
+	krEntry := widget.NewEntry()
+	krEntry.SetPlaceHolder("Key Result for the Objective above\u2026")
+
+	addObjBtn := widget.NewButton("Add Objective", func() {
+		text := strings.TrimSpace(newObjEntry.Text)
+		if text == "" {
+			return
+		}
+		recordObjective(text, period, anchor)
+		newObjEntry.SetText("")
+		refreshObjectives()
+	})
+	addKRBtn := widget.NewButton("Add Key Result", func() {
+		text := strings.TrimSpace(krEntry.Text)
+		if text == "" || latestObjectiveText == "" {
+			return
+		}
+		recordKeyResult(text, period, anchor)
+		krEntry.SetText("")
+		refreshObjectives()
+	})
+
+	newObjRow := container.New(newStretchRowLayout(newObjEntry), newObjEntry, addObjBtn)
+	krRow := container.New(newStretchRowLayout(krEntry), krEntry, addKRBtn)
+
+	return container.NewVBox(
+		widget.NewLabelWithStyle("OKRs for "+periodLabel(cfg, period, anchor), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabel("Theme:"),
+		focusRow,
+		objBox,
+		newObjRow,
+		widget.NewLabel("Key Result attaches to the most recently added Objective above:"),
+		krRow,
+	)
+}
+
 // showPeriodKickoffWindow shows a generic Kickoff dialog (docs/
-// kickoff-review-design.md) for period -- open TODOs/GOALs readback,
-// a quick-entry field, and (for Week/Month, which have a matching
-// recurring-item cadence) recurring-item suggestions. Used for Week,
-// Quarter, and Year, which have no bespoke dialog of their own (unlike
-// Day/Month's existing SOD/SOM). Deliberately does not duplicate a
-// smaller unit's own recurring-item surfacing when Kickoffs stack on
-// a shared boundary day (see design doc's "Kickoff: overlap/stacking"
-// section) -- each unit only ever surfaces its own cadence's items.
-func showPeriodKickoffWindow(a fyne.App, period summaryPeriod) {
+// kickoff-review-design.md) for period's unit containing anchor --
+// open TODOs/GOALs readback, a quick-entry field, and (for Week/
+// Month, which have a matching recurring-item cadence) recurring-item
+// suggestions. Used for Week, Quarter, and Year, which have no
+// bespoke dialog of their own (unlike Day/Month's existing SOD/Month
+// Kickoff). Deliberately does not duplicate a smaller unit's own
+// recurring-item surfacing when Kickoffs stack on a shared boundary
+// day (see design doc's "Kickoff: overlap/stacking" section) -- each
+// unit only ever surfaces its own cadence's items. anchor lets
+// callers (showPeriodPicker) open a period other than "the current
+// one", though Kickoff is normally only meaningful for the current/
+// upcoming period -- recurring-item due-ness always checks the real
+// current time regardless of anchor, since "what's due" is a
+// real-world fact, not something that makes sense to ask about a past
+// period.
+func showPeriodKickoffWindow(a fyne.App, period summaryPeriod, anchor time.Time) {
 	now := time.Now()
 	cfg := LoadConfig()
-	label := periodLabel(cfg, period, now)
+	label := periodLabel(cfg, period, anchor) + periodProgressSuffix(period, anchor)
 	w := a.NewWindow("Dunzo: " + string(period) + " Kickoff (" + label + ")")
 
 	listBox := container.NewVBox()
@@ -98,10 +197,13 @@ func showPeriodKickoffWindow(a fyne.App, period summaryPeriod) {
 		listScroll,
 		recurringBox,
 		entryRow,
-		widget.NewButton("Done", func() { w.Close() }),
 	)
+	if okrBox := okrKickoffSection(a, period, anchor); okrBox != nil {
+		content.Add(okrBox)
+	}
+	content.Add(widget.NewButton("Done", func() { w.Close() }))
 
 	w.SetContent(content)
-	w.Resize(fyne.NewSize(560, 480))
+	w.Resize(fyne.NewSize(560, 620))
 	w.Show()
 }

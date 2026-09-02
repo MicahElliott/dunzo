@@ -156,6 +156,32 @@ func weekStart(t time.Time) time.Time {
 	return d.AddDate(0, 0, -isoWeekday)
 }
 
+// periodOffsetAnchor returns a representative time.Time for the unit
+// offset periods away from the one containing anchor -- e.g.
+// periodOffsetAnchor(periodMonth, now, -1) returns a time in last
+// month, periodOffsetAnchor(periodQuarter, now, 0) returns a time in
+// the current quarter. Used by the period-picker preamble (docs/
+// kickoff-review-design.md) to let a user choose which of "this
+// period (so far)"/"last period"/a short back-list to open a
+// Kickoff/Review for, instead of every caller hardcoding "the
+// previous period" the way Month Review originally did.
+func periodOffsetAnchor(period summaryPeriod, anchor time.Time, offset int) time.Time {
+	switch period {
+	case periodDay:
+		return anchor.AddDate(0, 0, offset)
+	case periodWeek:
+		return anchor.AddDate(0, 0, offset*7)
+	case periodMonth:
+		return anchor.AddDate(0, offset, 0)
+	case periodQuarter:
+		return anchor.AddDate(0, offset*3, 0)
+	case periodYear:
+		return anchor.AddDate(offset, 0, 0)
+	default:
+		return anchor
+	}
+}
+
 // periodNominalRange returns the exact calendar boundaries [from, to]
 // of the unit containing anchor -- e.g. for periodQuarter, the first
 // instant of the quarter through the last instant of its last day.
@@ -199,13 +225,42 @@ const periodDataRangePadDays = 1
 // periodDataRange returns the [from, to] window to actually pull
 // source material from for period's Review of the unit containing
 // anchor -- the nominal calendar boundaries, padded loosely by
-// periodDataRangePadDays on each side. Titles/labels should always
-// use periodLabel instead of this range, since this range is
-// intentionally imprecise.
+// periodDataRangePadDays on each side, and clamped so `to` never
+// extends past `now` -- letting a Review be run for a period that's
+// still in progress (docs/kickoff-review-design.md's "mid-period"
+// support) without pulling in dates that haven't happened yet.
+// Titles/labels should always use periodLabel/periodProgressSuffix
+// instead of this range, since this range is intentionally
+// imprecise.
 func periodDataRange(period summaryPeriod, anchor time.Time) (from, to time.Time) {
 	from, to = periodNominalRange(period, anchor)
 	pad := time.Duration(periodDataRangePadDays) * 24 * time.Hour
-	return from.Add(-pad), to.Add(pad)
+	from, to = from.Add(-pad), to.Add(pad)
+	now := time.Now()
+	if to.After(now) {
+		to = now
+	}
+	return from, to
+}
+
+// periodIsInProgress reports whether the unit containing anchor
+// hasn't fully elapsed yet as of now -- i.e. this is a "so far" look
+// at a period still underway, not a completed-period retrospective.
+func periodIsInProgress(period summaryPeriod, anchor time.Time) bool {
+	_, to := periodNominalRange(period, anchor)
+	return to.After(time.Now())
+}
+
+// periodProgressSuffix returns a short parenthetical to append to a
+// Review/Kickoff window's title/label when the unit is still in
+// progress (e.g. "(through Sep 2)"), or "" for a fully-elapsed period
+// -- so a mid-period Review is clearly framed as partial rather than
+// silently implying the period already ended.
+func periodProgressSuffix(period summaryPeriod, anchor time.Time) string {
+	if !periodIsInProgress(period, anchor) {
+		return ""
+	}
+	return " (through " + time.Now().Format("Jan 2") + ")"
 }
 
 // kickoffEnabled/reviewEnabled/themeFor read a unit's Kickoff/Review
@@ -427,6 +482,10 @@ func generateThemedReview(cfg Config, period summaryPeriod, anchor time.Time) (s
 	if strings.TrimSpace(material.RawLedger) != "" {
 		combined.WriteString("Additional raw entries not yet summarized:\n\n")
 		combined.WriteString(material.RawLedger)
+	}
+	if okrText := okrSummaryText(cfg, period, anchor); okrText != "" {
+		combined.WriteString("\n\nOKR status for this period:\n\n")
+		combined.WriteString(okrText)
 	}
 	if strings.TrimSpace(combined.String()) == "" {
 		return fmt.Sprintf("(no entries found for %s)", periodLabel(cfg, period, anchor)), nil
