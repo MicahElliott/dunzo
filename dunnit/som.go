@@ -87,11 +87,9 @@ func showSOMWindow(a fyne.App) {
 	// string, so this is tracked separately.
 	digestText := ""
 	digestSavePath := periodReportPath("som", from, "200601")
-	themeSelect := widget.NewSelect(
-		[]string{ThemePersonalNotes, ThemeStatusReport, ThemeFormalReport, ThemeBragPreso},
-		nil)
+	themeSelect := widget.NewSelect(themeOptions(), nil)
 	cfg := LoadConfig()
-	themeSelect.SetSelected(themeFor(cfg, periodMonth))
+	themeSelect.SetSelected(themeDisplayNames[themeFor(cfg, periodMonth)])
 	copyDigestBtn := widget.NewButtonWithIcon("Copy", theme.Icon(theme.IconNameContentCopy), func() {
 		a.Clipboard().SetContent(digestText)
 	})
@@ -112,9 +110,8 @@ func showSOMWindow(a fyne.App) {
 		digestBody.ParseMarkdown("*Generating, please wait...*")
 		go func() {
 			overrideCfg := cfg
-			switch themeSelect.Selected {
-			case ThemePersonalNotes, ThemeStatusReport, ThemeFormalReport, ThemeBragPreso:
-				overrideCfg.ThemeMonth = themeSelect.Selected
+			if selected := themeFromDisplayName(themeSelect.Selected); selected != "" {
+				overrideCfg.ThemeMonth = selected
 			}
 			summary, err := generateThemedReview(overrideCfg, periodMonth, from)
 			if err != nil {

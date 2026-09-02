@@ -118,6 +118,16 @@ type Config struct {
 	ThemeMonth   string `toml:"theme_month"`
 	ThemeQuarter string `toml:"theme_quarter"`
 	ThemeYear    string `toml:"theme_year"`
+
+	// ExtendWorkWeekTo7Days, when true, shows the full Mon-Sun 7-day
+	// span in Week Kickoff/Review labels instead of the default
+	// Mon-Fri 5-day work week. Default false (5-day), toggled via
+	// Settings. Display-only -- Week's actual data-gathering range
+	// (periodNominalRange/periodDataRange for periodWeek) always
+	// covers the full Mon-Sun week regardless of this setting, so a
+	// weekend ledger entry is never silently excluded from a Week
+	// Review just because the label says "Mon-Fri".
+	ExtendWorkWeekTo7Days bool `toml:"extend_work_week_to_7_days"`
 }
 
 // defaultConfig mirrors the values from dunnit's config-example.zsh.

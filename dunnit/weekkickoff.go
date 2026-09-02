@@ -19,7 +19,8 @@ import (
 // same items (see design doc's "Kickoff: overlap/stacking" section).
 func showWeekKickoffWindow(a fyne.App) {
 	now := time.Now()
-	w := a.NewWindow("Dunzo: Week Kickoff (" + periodLabel(periodWeek, now) + ")")
+	cfg := LoadConfig()
+	w := a.NewWindow("Dunzo: Week Kickoff (" + periodLabel(cfg, periodWeek, now) + ")")
 
 	listBox := container.NewVBox()
 	refreshList := func() {
@@ -51,7 +52,7 @@ func showWeekKickoffWindow(a fyne.App) {
 	recurringBox := container.NewVBox()
 	refreshRecurring := func() {
 		recurringBox.RemoveAll()
-		due := dueRecurringItems(LoadConfig(), now, "weekly")
+		due := dueRecurringItems(cfg, now, "weekly")
 		if box := recurringItemsSuggestionBox(due, refreshList); box != nil {
 			recurringBox.Add(widget.NewLabelWithStyle("Recurring Items Due This Week", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
 			recurringBox.Add(box)
@@ -79,7 +80,7 @@ func showWeekKickoffWindow(a fyne.App) {
 	entryRow := container.New(newStretchRowLayout(newItemText), newItemCat, newItemText, addBtn)
 
 	content := container.NewVBox(
-		widget.NewLabel("Kicking off "+periodLabel(periodWeek, now)+" -- here's where things stand:"),
+		widget.NewLabel("Kicking off "+periodLabel(cfg, periodWeek, now)+" -- here's where things stand:"),
 		listScroll,
 		recurringBox,
 		entryRow,

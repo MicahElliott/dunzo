@@ -42,6 +42,41 @@ const (
 	ThemeBragPreso     = "brag_preso"
 )
 
+// themeDisplayNames maps each Theme* constant to its human-friendly
+// label for dropdowns/menus (e.g. "Personal Notes" instead of the raw
+// "personal_notes" TOML value). themeDisplayOrder is the fixed
+// presentation order for building a themeSelect-style dropdown.
+var themeDisplayNames = map[string]string{
+	ThemePersonalNotes: "Personal Notes",
+	ThemeStatusReport:  "Status Report",
+	ThemeFormalReport:  "Formal Report",
+	ThemeBragPreso:     "Brag Preso",
+}
+
+var themeDisplayOrder = []string{ThemePersonalNotes, ThemeStatusReport, ThemeFormalReport, ThemeBragPreso}
+
+// themeOptions returns the display-name options (in themeDisplayOrder)
+// for a theme-picker widget.Select.
+func themeOptions() []string {
+	opts := make([]string, len(themeDisplayOrder))
+	for i, t := range themeDisplayOrder {
+		opts[i] = themeDisplayNames[t]
+	}
+	return opts
+}
+
+// themeFromDisplayName reverses themeDisplayNames, e.g. "Status
+// Report" -> ThemeStatusReport. Returns "" if display isn't
+// recognized.
+func themeFromDisplayName(display string) string {
+	for _, t := range themeDisplayOrder {
+		if themeDisplayNames[t] == display {
+			return t
+		}
+	}
+	return ""
+}
+
 // quarterOf returns 1-4 for the traditional calendar quarter
 // containing t (Jan-Mar=1, Apr-Jun=2, Jul-Sep=3, Oct-Dec=4).
 func quarterOf(t time.Time) int {
@@ -52,21 +87,25 @@ func quarterOf(t time.Time) int {
 // naming the *nominal* calendar unit containing anchor -- always
 // independent of whatever partial data-fetch window a Review actually
 // managed to pull (see periodDataRange), so titles never read
-// something awkward like "covers Apr 1 - Jun 25".
+// something awkward like "covers Apr 1 - Jun 25". cfg is consulted
+// for periodWeek's ExtendWorkWeekTo7Days setting (5-day Mon-Fri
+// display by default, 7-day Mon-Sun if enabled) -- display-only, see
+// Config.ExtendWorkWeekTo7Days's doc comment.
 //
-// Examples: periodLabel(periodDay, t) -> "Mon Sep 1, 2026";
-// periodLabel(periodWeek, t) -> "Week of Sep 1, 2026" (week start is
-// Monday, matching time.Time.ISOWeek's convention used elsewhere in
-// this codebase); periodLabel(periodMonth, t) -> "Sep 2026";
-// periodLabel(periodQuarter, t) -> "Q3 2026 (Jul-Sep)";
-// periodLabel(periodYear, t) -> "2026".
-func periodLabel(period summaryPeriod, anchor time.Time) string {
+// Examples: periodLabel(cfg, periodDay, t) -> "Mon Sep 1, 2026";
+// periodLabel(cfg, periodWeek, t) -> "Week of Aug 31 - Sep 4 (W37)"
+// (5-day default) or "Week of Aug 31 - Sep 6 (W37)" (7-day, if
+// ExtendWorkWeekTo7Days) -- week start is Monday, matching
+// time.Time.ISOWeek's convention used elsewhere in this codebase;
+// periodLabel(cfg, periodMonth, t) -> "Sep 2026";
+// periodLabel(cfg, periodQuarter, t) -> "Q3 2026 (Jul-Sep)";
+// periodLabel(cfg, periodYear, t) -> "2026".
+func periodLabel(cfg Config, period summaryPeriod, anchor time.Time) string {
 	switch period {
 	case periodDay:
 		return anchor.Format("Mon Jan 2, 2006")
 	case periodWeek:
-		start := weekStart(anchor)
-		return "Week of " + start.Format("Jan 2, 2006")
+		return weekLabel(anchor, cfg.ExtendWorkWeekTo7Days)
 	case periodMonth:
 		return anchor.Format("Jan 2006")
 	case periodQuarter:
@@ -78,6 +117,30 @@ func periodLabel(period summaryPeriod, anchor time.Time) string {
 	default:
 		return string(period)
 	}
+}
+
+// weekLabel returns "Week of <start> - <end> (W<iso week>)" for the
+// week containing anchor -- end is start+4 days (Fri) by default, or
+// start+6 days (Sun) if extend7 is true. If start and end fall in the
+// same month, end is shown as just the day number (e.g. "Sep 7 - 11")
+// rather than repeating the month name; otherwise both months are
+// spelled out (e.g. "Aug 31 - Sep 4").
+func weekLabel(anchor time.Time, extend7 bool) string {
+	start := weekStart(anchor)
+	lastDayOffset := 4
+	if extend7 {
+		lastDayOffset = 6
+	}
+	end := start.AddDate(0, 0, lastDayOffset)
+	_, isoWeek := start.ISOWeek()
+
+	var rangeText string
+	if start.Month() == end.Month() {
+		rangeText = start.Format("Jan 2") + " - " + end.Format("2")
+	} else {
+		rangeText = start.Format("Jan 2") + " - " + end.Format("Jan 2")
+	}
+	return fmt.Sprintf("Week of %s (W%d)", rangeText, isoWeek)
 }
 
 // weekStart returns the Monday (00:00) of the ISO week containing t,
@@ -313,11 +376,11 @@ func generateThemedReview(cfg Config, period summaryPeriod, anchor time.Time) (s
 		combined.WriteString(material.RawLedger)
 	}
 	if strings.TrimSpace(combined.String()) == "" {
-		return fmt.Sprintf("(no entries found for %s)", periodLabel(period, anchor)), nil
+		return fmt.Sprintf("(no entries found for %s)", periodLabel(cfg, period, anchor)), nil
 	}
 
 	theme := themeFor(cfg, period)
-	title := periodLabel(period, anchor)
+	title := periodLabel(cfg, period, anchor)
 	instructions := themePromptFraming(theme, unitNoun(period), title) + reviewLengthConstraint(period)
 	return summarizeWithCopilotPrompt(instructions, combined.String())
 }
