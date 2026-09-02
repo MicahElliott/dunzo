@@ -292,19 +292,32 @@ rollup lookups).
 ## Implementation status
 
 - [x] Shared report Copy/Save/path helpers (`dunnit/report.go`)
-- [ ] `Period`/`periodConfig` type and per-unit config
-- [ ] Per-unit Kickoff/Review settings toggles (UI + config.toml)
-- [ ] `periodLabel` / `periodDataRange`
-- [ ] `gatherReviewSourceMaterial` rollup + ledger fallback
-- [ ] Shared length-constraint prompt suffix
-- [ ] Theme system (Personal Notes / Status Report / Formal Report /
-      Brag Preso) + per-unit default + override
+- [x] `Period`/`periodConfig` type and per-unit config
+      (`dunnit/period.go`, reuses existing `summaryPeriod` +
+      `periodYear` addition)
+- [x] Per-unit Kickoff/Review settings toggles (`Config` fields in
+      `dunnit/config.go` -- no dedicated Settings-window UI yet, only
+      config.toml-editable so far; menu regroup reads them)
+- [x] `periodLabel` / `periodDataRange` (`dunnit/period.go`)
+- [x] `gatherReviewSourceMaterial` rollup + ledger fallback
+      (`dunnit/review.go`)
+- [x] Shared length-constraint prompt suffix
+      (`reviewLengthConstraint`, wired into SOM + EOD)
+- [x] Theme system (Personal Notes / Status Report / Formal Report /
+      Brag Preso) + per-unit default + override (`themePromptFraming`,
+      `generateThemedReview`; wired into SOM with a theme dropdown)
 - [ ] Pandoc export action
 - [ ] Week Kickoff + Review (new, no prior art)
 - [ ] Quarter Kickoff + Review (new, no prior art)
 - [ ] Year Kickoff + Review (new, no prior art)
 - [ ] Split SOM into Month Review + Month Kickoff
-- [ ] Menu regroup (see open question below)
+- [x] Menu regroup: `Kickoff.../Review...` submenus in `ui.go`,
+      currently only listing Day/Month (only units with implemented
+      dialogs); Week/Quarter/Year omitted until their dialogs exist
+- [ ] Settings-window UI for the 10 toggles + 5 theme defaults
+      (currently config.toml-only)
+- [ ] Reconcile Reports menu's "Annual Review..." into `Review... ->
+      Year` once Year Review exists
 
 ## Menu/UI shape -- decided 2026-09-01
 
