@@ -778,29 +778,38 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 
 		// Kickoff.../Review... submenus (docs/kickoff-review-design.md),
 		// replacing the old flat Start of Day/End of Day/Start of
-		// Month items. Day, Week, and Month have implemented dialogs
-		// -- Quarter/Year don't yet, so their items are omitted
-		// entirely regardless of their Config toggle value, rather
-		// than showing a placeholder. Each included item is further
-		// gated by its own kickoffEnabled/reviewEnabled Config
-		// toggle, re-read fresh each time the menu is (re)built via
-		// BuildMainWindow.
+		// Month items. Day and Month keep their existing bespoke
+		// dialogs (SOD/EOD/SOM); Week/Quarter/Year route through the
+		// generic showPeriodKickoffWindow/showPeriodReviewWindow
+		// (periodkickoff.go/periodreview.go), which have no bespoke
+		// dialog of their own since their shape is identical. Each
+		// included item is gated by its own kickoffEnabled/
+		// reviewEnabled Config toggle, re-read fresh each time the
+		// menu is (re)built via BuildMainWindow -- Quarter/Year
+		// default off (see Config's doc comment), so they won't
+		// appear until explicitly enabled.
 		cfg := LoadConfig()
 		var kickoffItems, reviewItems []*fyne.MenuItem
 		if kickoffEnabled(cfg, periodDay) {
 			kickoffItems = append(kickoffItems, fyne.NewMenuItem("Day...", func() { showSODWindow(a) }))
 		}
 		if kickoffEnabled(cfg, periodWeek) {
-			kickoffItems = append(kickoffItems, fyne.NewMenuItem("Week...", func() { showWeekKickoffWindow(a) }))
+			kickoffItems = append(kickoffItems, fyne.NewMenuItem("Week...", func() { showPeriodKickoffWindow(a, periodWeek) }))
 		}
 		if kickoffEnabled(cfg, periodMonth) {
 			kickoffItems = append(kickoffItems, fyne.NewMenuItem("Month...", func() { showSOMWindow(a) }))
+		}
+		if kickoffEnabled(cfg, periodQuarter) {
+			kickoffItems = append(kickoffItems, fyne.NewMenuItem("Quarter...", func() { showPeriodKickoffWindow(a, periodQuarter) }))
+		}
+		if kickoffEnabled(cfg, periodYear) {
+			kickoffItems = append(kickoffItems, fyne.NewMenuItem("Year...", func() { showPeriodKickoffWindow(a, periodYear) }))
 		}
 		if reviewEnabled(cfg, periodDay) {
 			reviewItems = append(reviewItems, fyne.NewMenuItem("Day...", func() { showEODWindow(a) }))
 		}
 		if reviewEnabled(cfg, periodWeek) {
-			reviewItems = append(reviewItems, fyne.NewMenuItem("Week...", func() { showWeekReviewWindow(a) }))
+			reviewItems = append(reviewItems, fyne.NewMenuItem("Week...", func() { showPeriodReviewWindow(a, periodWeek) }))
 		}
 		// Month's Review is currently folded into showSOMWindow
 		// (SOM does both prior-month review and new-month kickoff in
@@ -809,6 +818,12 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		// just opens the same SOM window as Month's Kickoff.
 		if reviewEnabled(cfg, periodMonth) {
 			reviewItems = append(reviewItems, fyne.NewMenuItem("Month...", func() { showSOMWindow(a) }))
+		}
+		if reviewEnabled(cfg, periodQuarter) {
+			reviewItems = append(reviewItems, fyne.NewMenuItem("Quarter...", func() { showPeriodReviewWindow(a, periodQuarter) }))
+		}
+		if reviewEnabled(cfg, periodYear) {
+			reviewItems = append(reviewItems, fyne.NewMenuItem("Year...", func() { showPeriodReviewWindow(a, periodYear) }))
 		}
 		kickoffItem := fyne.NewMenuItem("Kickoff", nil)
 		kickoffItem.ChildMenu = fyne.NewMenu("Kickoff", kickoffItems...)

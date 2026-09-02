@@ -270,6 +270,25 @@ func themeFor(cfg Config, period summaryPeriod) string {
 	return periodConfigs[period].DefaultTheme
 }
 
+// setTheme writes value into cfg's per-unit theme field for period --
+// the mutating counterpart to themeFor, used by callers building a
+// one-off override Config (e.g. showPeriodReviewWindow's per-instance
+// theme dropdown) without touching the persisted config.toml.
+func setTheme(cfg *Config, period summaryPeriod, value string) {
+	switch period {
+	case periodDay:
+		cfg.ThemeDay = value
+	case periodWeek:
+		cfg.ThemeWeek = value
+	case periodMonth:
+		cfg.ThemeMonth = value
+	case periodQuarter:
+		cfg.ThemeQuarter = value
+	case periodYear:
+		cfg.ThemeYear = value
+	}
+}
+
 // reviewLengthWords is the rough target word-count ceiling to instruct
 // the copilot prompt with for each unit's Review, scaled so a Day
 // digest stays tight while a Year digest is allowed more room to

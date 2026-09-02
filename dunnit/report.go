@@ -1,6 +1,8 @@
 package dun
 
 import (
+	"bytes"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -10,6 +12,8 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+
+	"github.com/yuin/goldmark"
 )
 
 // periodReportPath returns DunzoDir()/<kind>-<date formatted with
@@ -56,5 +60,72 @@ func showGeneratedReport(a fyne.App, title, savePath, text string) {
 		scroll,
 	))
 	w.Resize(fyne.NewSize(520, 420))
+	w.Show()
+}
+
+// markdownToHTML renders md as a minimal standalone HTML document via
+// goldmark (already an indirect Fyne dependency, promoted here to a
+// direct import -- no new dependency actually added). Used by
+// showEditableReportWindow's "Copy as HTML" action. Returns md
+// unchanged (wrapped in <pre>) if conversion fails, rather than
+// erroring out the whole Copy action.
+func markdownToHTML(md string) string {
+	var buf bytes.Buffer
+	if err := goldmark.Convert([]byte(md), &buf); err != nil {
+		log.Println("Error converting markdown to HTML:", err)
+		return "<pre>" + md + "</pre>"
+	}
+	return "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"></head><body>\n" +
+		buf.String() + "\n</body></html>"
+}
+
+// showEditableReportWindow displays a generated report in an editable
+// Markdown text window (not the read-only showGeneratedReport above --
+// Reviews are meant to be tweakable before saving, per
+// docs/kickoff-review-design.md's Review model) with a live Markdown
+// preview below, and Save/Copy as HTML/Close actions. Save writes the
+// *current edited text* (not the original draft) to savePath.
+func showEditableReportWindow(a fyne.App, title, savePath, initialText string) {
+	w := a.NewWindow(title)
+
+	editor := widget.NewMultiLineEntry()
+	editor.SetText(initialText)
+	editor.Wrapping = fyne.TextWrapWord
+
+	preview := widget.NewRichTextFromMarkdown(initialText)
+	preview.Wrapping = fyne.TextWrapWord
+	editor.OnChanged = func(text string) {
+		preview.ParseMarkdown(text)
+	}
+
+	editorScroll := container.NewVScroll(editor)
+	editorScroll.SetMinSize(fyne.NewSize(0, 260))
+	previewScroll := container.NewVScroll(preview)
+	previewScroll.SetMinSize(fyne.NewSize(0, 260))
+
+	saveBtn := widget.NewButtonWithIcon("Save", theme.Icon(theme.IconNameDocumentSave), func() {
+		if err := os.WriteFile(savePath, []byte(editor.Text), 0644); err != nil {
+			dialog.ShowError(err, w)
+			return
+		}
+		dialog.ShowInformation("Saved", "Saved to "+savePath, w)
+	})
+	copyHTMLBtn := widget.NewButtonWithIcon("Copy as HTML", theme.Icon(theme.IconNameContentCopy), func() {
+		a.Clipboard().SetContent(markdownToHTML(editor.Text))
+	})
+	closeBtn := widget.NewButton("Close", func() { w.Close() })
+
+	content := container.NewBorder(
+		widget.NewLabelWithStyle("Edit (Markdown):", fyne.TextAlignLeading, fyne.TextStyle{Italic: true}),
+		container.NewVBox(
+			widget.NewLabelWithStyle("Preview:", fyne.TextAlignLeading, fyne.TextStyle{Italic: true}),
+			previewScroll,
+			container.NewHBox(saveBtn, copyHTMLBtn, closeBtn),
+		),
+		nil, nil,
+		editorScroll,
+	)
+	w.SetContent(content)
+	w.Resize(fyne.NewSize(640, 720))
 	w.Show()
 }

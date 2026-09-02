@@ -111,7 +111,7 @@ func showSOMWindow(a fyne.App) {
 		go func() {
 			overrideCfg := cfg
 			if selected := themeFromDisplayName(themeSelect.Selected); selected != "" {
-				overrideCfg.ThemeMonth = selected
+				setTheme(&overrideCfg, periodMonth, selected)
 			}
 			summary, err := generateThemedReview(overrideCfg, periodMonth, from)
 			if err != nil {
