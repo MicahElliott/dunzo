@@ -234,6 +234,26 @@ func openInEditor(path string) {
 	}
 }
 
+// visualLabelWidth returns a Category Label()'s rendered-width-in-
+// characters, for column-alignment purposes (showHelp) -- rune count
+// alone overcounts emoji sequences that include an invisible Unicode
+// variation selector (U+FE0F, "present this as emoji-style"), which
+// several category emoji use (e.g. "✔️" DONE, "🗑️" WASTED, "⚠️" RISK,
+// "🕰️" SOMEDAY, "🏎️" OPTIMIZE all end in one) -- those labels were
+// rendering one column short in showHelp's alignment before this fix,
+// since len([]rune(...)) counted the selector as an extra character
+// that takes up no visible width.
+func visualLabelWidth(label string) int {
+	width := 0
+	for _, r := range label {
+		if r == '\uFE0F' { // VARIATION SELECTOR-16, zero visual width
+			continue
+		}
+		width++
+	}
+	return width
+}
+
 // showHelp opens a static window listing every category's emoji/code
 // and one-line intended-use description (FR-06), grouped by Now/Plan/
 // Reflect with section headers. Text comes directly from Categories
@@ -259,15 +279,16 @@ func showHelp(a fyne.App) {
 	// to before appending its Help text -- without this, Help text
 	// starts at a different column per row (labels vary quite a bit
 	// in length, e.g. "✔️ DONE" vs "🏁 MILESTONE"), making the whole
-	// legend look jagged. Computed as the longest non-EODOnly Label()
-	// (rune count) + 1, so it stays correct as categories are added/
-	// renamed rather than needing a hand-picked constant kept in sync.
+	// legend look jagged. Computed as the longest non-EODOnly
+	// visualLabelWidth + 1, so it stays correct as categories are
+	// added/renamed rather than needing a hand-picked constant kept
+	// in sync.
 	labelColWidth := 0
 	for _, c := range Categories {
 		if c.EODOnly {
 			continue
 		}
-		if n := len([]rune(c.Label())); n > labelColWidth {
+		if n := visualLabelWidth(c.Label()); n > labelColWidth {
 			labelColWidth = n
 		}
 	}
@@ -288,8 +309,7 @@ func showHelp(a fyne.App) {
 			lastGroup = c.Group
 		}
 		label := c.Label()
-		labelRunes := []rune(label)
-		if pad := labelColWidth - len(labelRunes); pad > 0 {
+		if pad := labelColWidth - visualLabelWidth(label); pad > 0 {
 			label += strings.Repeat(" ", pad)
 		}
 		txt := canvas.NewText(label+"\u2014 "+c.Help, theme.Color(theme.ColorNameForeground))
@@ -373,10 +393,28 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// input.Resize(fyne.NewSize(100.0, 50.0))
 
 	// Tag autocomplete (FR-10): as the user types a "#tag" fragment,
-	// show a popup menu of matching previously-used tags (scanned
-	// from ledger history, cached -- see tags.go). Selecting an entry
+	// show a popup of matching previously-used tags (scanned from
+	// ledger history, cached -- see tags.go). Selecting an entry
 	// replaces the in-progress fragment with the full tag.
-	var tagPopup *widget.PopUpMenu
+	//
+	// Built on plain widget.PopUp (not widget.PopUpMenu, the original
+	// 2026-08-xx implementation) -- PopUpMenu.Show() unconditionally
+	// steals keyboard focus via canvas.Focus(p), and its TypedRune is
+	// a no-op, so every keystroke after the popup appeared went to
+	// the (non-reacting) menu instead of `input`, requiring an
+	// explicit Esc (PopUpMenu.TypedKey's only path back out) before
+	// another letter could be typed -- effectively broken multi-
+	// letter typing (2026-09-02 bug report: "feels fully broken").
+	// The refocus-via-fyne.Do workaround below tried to fight this
+	// every keystroke but evidently lost the race often enough in
+	// practice. Plain widget.PopUp's Show() does not call
+	// canvas.Focus() at all, so `input` never loses focus in the
+	// first place -- selecting a suggestion is done by mouse click on
+	// one of the popup's plain buttons instead of PopUpMenu's
+	// keyboard-navigable menu items (a small capability trade-off,
+	// but keyboard typing into `input` working correctly matters far
+	// more than keyboard-navigating the suggestion list itself).
+	var tagPopup *widget.PopUp
 	dismissTagPopup := func() {
 		if tagPopup != nil {
 			tagPopup.Hide()
@@ -393,34 +431,26 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		if len(matches) == 0 {
 			return
 		}
-		items := make([]*fyne.MenuItem, len(matches))
-		for i, tag := range matches {
+		canvas := fyne.CurrentApp().Driver().CanvasForObject(input)
+		if canvas == nil {
+			return
+		}
+		box := container.NewVBox()
+		for _, tag := range matches {
 			tag := tag // capture
-			items[i] = fyne.NewMenuItem(tag, func() {
+			box.Add(widget.NewButton(tag, func() {
 				runes := []rune(text)
 				newText := string(runes[:start]) + tag + string(runes[input.CursorColumn:])
 				input.SetText(newText)
 				input.CursorColumn = start + len([]rune(tag))
 				input.Refresh()
 				dismissTagPopup()
-			})
+				canvas.Focus(input)
+			}))
 		}
-		canvas := fyne.CurrentApp().Driver().CanvasForObject(input)
-		if canvas == nil {
-			return
-		}
-		tagPopup = widget.NewPopUpMenu(fyne.NewMenu("", items...), canvas)
+		tagPopup = widget.NewPopUp(box, canvas)
 		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(input)
 		tagPopup.ShowAtPosition(pos.Add(fyne.NewPos(0, input.Size().Height)))
-		// PopUpMenu.Show() unconditionally steals keyboard focus via
-		// canvas.Focus(p). A synchronous re-focus call right after
-		// ShowAtPosition isn't enough -- Show()'s own focus-steal
-		// seems to still win. Defer the refocus via fyne.Do so it
-		// runs after the current UI update cycle, once the popup's
-		// own Show() has finished.
-		fyne.Do(func() {
-			canvas.Focus(input)
-		})
 	}
 
 	// minsInput is an optional free-text "minutes spent" field (very
