@@ -163,15 +163,74 @@ did I accomplish on topic X" bullet from the initial navigator
 brainstorm, composed with the category/tag/date filters rather than
 built as its own separate screen.
 
+### Histogram (2026-09-02, same session)
+
+Wired `categoryCounts`/`sortedCategoryCounts` into an actual view:
+Navigator's "Histogram..." button renders the currently-filtered
+entry set's per-category breakdown as a plain-text ASCII bar chart
+(`formatCategoryHistogram`), scaled so the largest bar is a fixed
+width (`histogramBarWidth`) and every other bar proportional to it --
+matching `trend.go`'s existing house style (no charting library).
+Opens in its own window, same rationale as the Ask-AI answer window
+(stays open alongside the filtered browse view).
+
+### Reports Library (2026-09-02, same session)
+
+New, separate corpus/window from Navigator (which only covers raw
+ledgers) -- **reportindex.go**/**reportsearch.go**/**reportslibrary.go**:
+
+- `ReportFile` (reportindex.go): lightweight per-report-file metadata
+  (Path, Kind, Theme, Date=file mtime) -- deliberately much lighter
+  than `LedgerEntry`, since reports are large markdown documents, not
+  per-line structured data. `AllReportFiles()` walks `DunzoDir()`'s
+  root (`review-*`/`dsu-*`/`som-*`) plus every ledger-adjacent
+  `summary-*.md` daily-summary doc (`dailysummary.go`'s per-day-
+  directory convention), parsing kind/theme out of each filename via
+  `parseReportFileName` (reusing the same dash-suffix theme-stripping
+  approach `review.go`'s `listReviewReportsForPeriod` already uses,
+  generalized across all known report-file kinds). No caching (unlike
+  `AllLedgerEntries`) -- report file counts are expected to be orders
+  of magnitude smaller than ledger line counts, so a fresh walk per
+  call is cheap enough; revisit if that assumption proves wrong.
+- `SearchReports(query)` (reportsearch.go): case-insensitive substring
+  search across every report body (read via `ReportBody`), returning
+  one result per matching file with a short surrounding excerpt
+  (`excerptAround`) rather than dumping the whole body -- "which
+  reports mention X", not an every-occurrence full-text index.
+- `showReportsLibraryWindow(a)` (reportslibrary.go, tray: Reports ->
+  Reports Library...): combines a Kind filter (dropdown, chronological
+  browse of one report family by file mtime) with the free-text search
+  above in one window -- selecting a result line and clicking "Open
+  Selected Line..." opens the full report in `showGeneratedReport`
+  (report.go), reusing the same read-only viewer (with Copy/Save)
+  every other report-producing feature already uses, rather than
+  building a new one-off viewer.
+
+**Note on Status Report/Annual Review/Kickoff**: these are NOT
+included in `AllReportFiles()` -- confirmed during this work that
+Status Report and Annual Review are clipboard-only (no `WriteFile`
+call anywhere in `statusreport.go`/`annualreview.go`), and Kickoff
+windows don't appear to save to disk either. Only Review
+(`review-*`), Standup (`dsu-*`), and Daily Summary (`summary-*`)
+actually persist as files today -- Reports Library only browses what
+genuinely exists on disk.
+
+This closes out the "Saved-reports library/browser" and "Cross-report
+search" bullets from the original navigator brainstorm.
+
 ## Open items / next steps (not yet done)
 
-- Wire `categoryCounts`/`sortedCategoryCounts` into an actual
-  histogram view once a mode wants it.
-- Free (arbitrary) date-range picker, if the fixed dropdown options
-  prove too coarse in practice.
+- Free (arbitrary) date-range picker for Navigator, if the fixed
+  dropdown options prove too coarse in practice.
 - Multi-select category filter (currently single-select) if browsing
   "FIXME + RISK together" turns out to be a common need.
-- Reports-corpus indexing (separate from `LedgerEntry`) for cross-
-  report search / saved-reports library browsing.
 - Saved/pinned queries, once real usage shows which filter
   combinations get reused often.
+- Reports Library's Kind dropdown is single-select and its results
+  view is a plain click-a-line-number affordance (`CursorRow`-based),
+  not a proper clickable list widget -- fine for a first pass, but
+  worth a real `widget.List`-based results view if this gets used a
+  lot.
+- Ask-AI-about-these for Reports Library (parallel to Navigator's),
+  if a use case for it shows up (e.g. "what changed between these two
+  Quarter reviews").

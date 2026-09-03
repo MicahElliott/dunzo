@@ -925,6 +925,7 @@ func buildTrayMenu(a fyne.App, w4 fyne.Window) *fyne.Menu {
 		fyne.NewMenuItem("Status Report...", func() { showStatusReportDialog(a) }),
 		fyne.NewMenuItem("Annual Review...", func() { showAnnualReviewDialog(a) }),
 		fyne.NewMenuItem("Trend View...", func() { showTrendView(a) }),
+		fyne.NewMenuItem("Reports Library...", func() { showReportsLibraryWindow(a) }),
 	)
 	reportsItem := fyne.NewMenuItem("Reports", nil)
 	reportsItem.ChildMenu = reportsMenu
