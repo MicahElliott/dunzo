@@ -113,7 +113,10 @@ func showEditItemDialog(parent fyne.Window, item OpenItem, onSave func()) {
 }
 
 // writeLedgerLines overwrites today's ledger file with the given
-// lines (each gets a trailing newline).
+// lines (each gets a trailing newline). Invalidates the shared
+// ledger entry index (ledgerindex.go) afterward, since every caller
+// here (undo/edit/category-rewrite) changes ledger contents outside
+// of recordActivity's own append path.
 func writeLedgerLines(lines []string) error {
 	_, fname := getLedger()
 	f, err := os.Create(fname)
@@ -126,6 +129,7 @@ func writeLedgerLines(lines []string) error {
 			return err
 		}
 	}
+	InvalidateLedgerIndex()
 	return nil
 }
 

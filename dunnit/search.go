@@ -16,24 +16,30 @@ type searchResult struct {
 	line string
 }
 
-// searchLedgers scans every ledger file (allLedgerFiles, from
-// summarize.go) for lines containing query as a case-insensitive
-// substring, returning matches in file-walk order (roughly
-// chronological, since ledger dirs/files sort that way). Empty query
-// matches nothing (avoids an accidental full dump).
+// searchLedgers scans every ledger entry (via FilterLedgerEntries,
+// backed by the shared AllLedgerEntries() index -- see
+// ledgerindex.go) for entries containing query as a case-insensitive
+// substring of their Text, returning matches in chronological order.
+// Empty query matches nothing (avoids an accidental full dump).
+//
+// Note: this only matches against parsed Text, not the raw line
+// (e.g. the "[HH:MM:SS] CATEGORY " prefix) -- a query like "DONE"
+// will match entries whose *text* contains "DONE" but not match
+// purely by category the way the old raw-substring scan incidentally
+// could. Searching by category is better served by a category filter
+// (LedgerQuery.Categories) than by relying on substring matching the
+// category code.
 func searchLedgers(query string) []searchResult {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil
 	}
-	lowerQuery := strings.ToLower(query)
 	var out []searchResult
-	for _, path := range allLedgerFiles() {
-		for _, line := range readLedgerLinesFrom(path) {
-			if strings.Contains(strings.ToLower(line), lowerQuery) {
-				out = append(out, searchResult{file: filepath.Base(path), line: line})
-			}
-		}
+	for _, e := range FilterLedgerEntries(LedgerQuery{Text: query}) {
+		out = append(out, searchResult{
+			file: filepath.Base(e.Source),
+			line: "[" + e.Time.Format("15:04:05") + "] " + e.Category + " " + e.Text,
+		})
 	}
 	return out
 }

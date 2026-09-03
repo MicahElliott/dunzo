@@ -35,50 +35,43 @@ func sentimentScore(s string) (int, bool) {
 	return 0, false
 }
 
-// gatherTrendPoints scans all ledger files dated within the last days
-// days (inclusive of today) and returns one trendPoint per day that
-// has at least one PRODUCTIVITY or SENTIMENT entry, oldest first.
-// Reads existing data only -- no new capture (FR-20 has no new data
-// requirement).
+// gatherTrendPoints scans all ledger entries (via AllLedgerEntries(),
+// the shared index) dated within the last days days (inclusive of
+// today) and returns one trendPoint per day that has at least one
+// PRODUCTIVITY or SENTIMENT entry, oldest first. Reads existing data
+// only -- no new capture (FR-20 has no new data requirement).
 func gatherTrendPoints(days int) []trendPoint {
 	since := time.Now().AddDate(0, 0, -days)
 	byDate := map[string]*trendPoint{}
-	for _, path := range allLedgerFiles() {
-		date := ledgerFileDate(path)
-		if date == nil || date.Before(since) {
+	for _, e := range AllLedgerEntries() {
+		if e.Date.Before(since) {
 			continue
 		}
-		key := date.Format("20060102")
-		for _, line := range readLedgerLinesFrom(path) {
-			cat, text, ok := parseLedgerLine(line)
+		key := e.Date.Format("20060102")
+		switch e.Category {
+		case "PRODUCTIVITY":
+			n, err := strconv.Atoi(strings.TrimSpace(e.Text))
+			if err != nil {
+				continue
+			}
+			pt := byDate[key]
+			if pt == nil {
+				pt = &trendPoint{date: e.Date}
+				byDate[key] = pt
+			}
+			pt.productivity = n
+		case "SENTIMENT":
+			score, ok := sentimentScore(strings.TrimSpace(e.Text))
 			if !ok {
 				continue
 			}
-			switch cat {
-			case "PRODUCTIVITY":
-				n, err := strconv.Atoi(strings.TrimSpace(text))
-				if err != nil {
-					continue
-				}
-				pt := byDate[key]
-				if pt == nil {
-					pt = &trendPoint{date: *date}
-					byDate[key] = pt
-				}
-				pt.productivity = n
-			case "SENTIMENT":
-				score, ok := sentimentScore(strings.TrimSpace(text))
-				if !ok {
-					continue
-				}
-				pt := byDate[key]
-				if pt == nil {
-					pt = &trendPoint{date: *date}
-					byDate[key] = pt
-				}
-				pt.sentiment = score
-				pt.sentimentSet = true
+			pt := byDate[key]
+			if pt == nil {
+				pt = &trendPoint{date: e.Date}
+				byDate[key] = pt
 			}
+			pt.sentiment = score
+			pt.sentimentSet = true
 		}
 	}
 	var out []trendPoint

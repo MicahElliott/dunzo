@@ -1,10 +1,8 @@
 package dun
 
 import (
-	"bufio"
 	"fmt"
 	"math"
-	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -82,22 +80,15 @@ func InvalidateTagCache() {
 	globalTagCache.tags = nil
 }
 
-// scanAllTags walks every ledger-*.txt file under DunzoDir() and
-// collects every distinct #tag, sorted alphabetically.
+// scanAllTags collects every distinct #tag across all ledger entries
+// (via AllLedgerEntries(), the shared index -- see ledgerindex.go),
+// sorted alphabetically.
 func scanAllTags() []string {
 	seen := make(map[string]bool)
-	for _, path := range allLedgerFiles() {
-		f, err := os.Open(path)
-		if err != nil {
-			continue
+	for _, e := range AllLedgerEntries() {
+		for _, tag := range e.Tags {
+			seen[tag] = true
 		}
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			for _, tag := range extractTags(scanner.Text()) {
-				seen[tag] = true
-			}
-		}
-		f.Close()
 	}
 	tags := make([]string, 0, len(seen))
 	for t := range seen {
@@ -122,46 +113,38 @@ type tagStat struct {
 	lastSeen time.Time
 }
 
-// gatherTagStats scans all ledger history once and returns, per tag,
-// its total occurrence count and a frecency score -- each
-// occurrence's weight exponentially decays with the age of that
-// occurrence (half-life tagRecencyHalfLife days), so a tag's score is
-// dominated by recent usage rather than lifetime total (see git log
-// 2026-08-31 fix for why: an earlier version let heavy historical-
-// but-stale usage permanently outrank genuinely recent tags).
+// gatherTagStats scans all ledger history once (via
+// AllLedgerEntries(), the shared index) and returns, per tag, its
+// total occurrence count and a frecency score -- each occurrence's
+// weight exponentially decays with the age of that occurrence
+// (half-life tagRecencyHalfLife days), so a tag's score is dominated
+// by recent usage rather than lifetime total (see git log 2026-08-31
+// fix for why: an earlier version let heavy historical-but-stale
+// usage permanently outrank genuinely recent tags).
 func gatherTagStats() map[string]*tagStat {
 	stats := map[string]*tagStat{}
 	now := time.Now()
-	for _, path := range allLedgerFiles() {
-		date := ledgerFileDate(path)
-		if date == nil {
+	for _, e := range AllLedgerEntries() {
+		if len(e.Tags) == 0 {
 			continue
 		}
-		daysSince := now.Sub(*date).Hours() / 24
+		daysSince := now.Sub(e.Date).Hours() / 24
 		if daysSince < 0 {
 			daysSince = 0
 		}
 		weight := math.Pow(0.5, daysSince/tagRecencyHalfLife)
-		f, err := os.Open(path)
-		if err != nil {
-			continue
-		}
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			for _, tag := range extractTags(scanner.Text()) {
-				st := stats[tag]
-				if st == nil {
-					st = &tagStat{}
-					stats[tag] = st
-				}
-				st.count++
-				st.score += weight
-				if date.After(st.lastSeen) {
-					st.lastSeen = *date
-				}
+		for _, tag := range e.Tags {
+			st := stats[tag]
+			if st == nil {
+				st = &tagStat{}
+				stats[tag] = st
+			}
+			st.count++
+			st.score += weight
+			if e.Date.After(st.lastSeen) {
+				st.lastSeen = e.Date
 			}
 		}
-		f.Close()
 	}
 	return stats
 }
