@@ -9,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 
 	"log"
 	"os"
@@ -165,6 +166,7 @@ func recordActivity(text, category string) {
 	if len(extractTags(text)) > 0 {
 		InvalidateTagCache()
 	}
+	InvalidateLedgerIndex()
 }
 
 // readLedgerLines returns all lines from today's ledger file (empty if
@@ -239,7 +241,11 @@ func openInEditor(path string) {
 // picker options. Positive-sentiment categories render bold dark
 // green; negative-sentiment ones render dark red. Named "Help" (not
 // "Category Legend") in the UI -- broader framing for a window that
-// may grow beyond just categories later.
+// may grow beyond just categories later. EODOnly categories (SUMMARY/
+// PRODUCTIVITY/MEETING_HOURS) are excluded entirely -- they're always
+// machine-written bookkeeping from eod.go's Finalize Day flow, never
+// hand-picked, so they'd only clutter a legend meant to help someone
+// choose a category from the live picker.
 //
 // Note: this coloring only applies to the static Help window -- Fyne's
 // widget.Select doesn't support per-option rich text/color in its
@@ -248,10 +254,32 @@ func showHelp(a fyne.App) {
 	darkGreen := color.NRGBA{R: 0, G: 100, B: 0, A: 255}
 	darkRed := color.NRGBA{R: 139, G: 0, B: 0, A: 255}
 
+	// labelColWidth is the fixed column width (in characters, since
+	// labels render Monospace) each category's Label() is padded out
+	// to before appending its Help text -- without this, Help text
+	// starts at a different column per row (labels vary quite a bit
+	// in length, e.g. "✔️ DONE" vs "🏁 MILESTONE"), making the whole
+	// legend look jagged. Computed as the longest non-EODOnly Label()
+	// (rune count) + 1, so it stays correct as categories are added/
+	// renamed rather than needing a hand-picked constant kept in sync.
+	labelColWidth := 0
+	for _, c := range Categories {
+		if c.EODOnly {
+			continue
+		}
+		if n := len([]rune(c.Label())); n > labelColWidth {
+			labelColWidth = n
+		}
+	}
+	labelColWidth++
+
 	w := a.NewWindow("Dunzo: Help")
 	rows := container.NewVBox()
 	lastGroup := ""
 	for _, c := range Categories {
+		if c.EODOnly {
+			continue
+		}
 		if c.Group != lastGroup {
 			header := canvas.NewText(GroupLabel(c.Group), theme.Color(theme.ColorNameForeground))
 			header.TextSize = 12
@@ -259,7 +287,12 @@ func showHelp(a fyne.App) {
 			rows.Add(header)
 			lastGroup = c.Group
 		}
-		txt := canvas.NewText(c.Label()+" \u2014 "+c.Help, theme.Color(theme.ColorNameForeground))
+		label := c.Label()
+		labelRunes := []rune(label)
+		if pad := labelColWidth - len(labelRunes); pad > 0 {
+			label += strings.Repeat(" ", pad)
+		}
+		txt := canvas.NewText(label+"\u2014 "+c.Help, theme.Color(theme.ColorNameForeground))
 		txt.TextSize = 10
 		txt.TextStyle = fyne.TextStyle{Monospace: true}
 		switch c.Sentiment {
@@ -485,7 +518,18 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// order matches visual left-to-right order) while still letting
 	// `input` stretch to fill available width like NewBorder's center
 	// content would have.
-	doneWrapper := container.New(newStretchRowLayout(input), groupFilter, category, input, minsWrapper)
+	// doneWrapper is the main entry row (groupFilter/category/input/
+	// minsWrapper) -- Daybook's single most important row, where
+	// virtually every interaction starts. Window-edge spacing is now
+	// handled once, uniformly, by the outer contentPad wrap below
+	// (see its comment) -- this local wrap only adds a bit of extra
+	// *bottom* padding to visually separate this row from
+	// commonTagsRow underneath it, since it's the primary piece of
+	// Daybook and deserves to stand apart from the rest. Value is an
+	// arbitrary "looks reasonable" pick, not theme-driven -- adjust
+	// here if it looks off.
+	doneWrapper := container.New(layout.NewCustomPaddedLayout(0, 6, 0, 0),
+		container.New(newStretchRowLayout(input), groupFilter, category, input, minsWrapper))
 
 	fmt.Println(input.MinSize())
 
@@ -814,7 +858,20 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// grid := container.New(layout.NewFormLayout(),
 	// 	label1, value1, label2, value2, content)
 
-	w4.SetContent(content)
+	// contentPad wraps the entire window content in fixed edge
+	// padding, independent of compactTheme's Size overrides (theme.go)
+	// -- those only affect spacing *between* sibling widgets, not the
+	// gap between the outermost content and the window frame, which
+	// is why the earlier attempt at window-edge spacing (doneWrapper's
+	// own internal CustomPaddedLayout) only visibly helped the very
+	// top row (it happens to sit flush against the window's top/left/
+	// right edges as the first VBox child) and did nothing for the
+	// left/right/bottom edges of every other section below it, or the
+	// bottom edge overall. This single outer wrap covers all edges,
+	// for every section, in one place.
+	contentPad := container.New(layout.NewCustomPaddedLayout(10, 10, 10, 10), content)
+
+	w4.SetContent(contentPad)
 	w4.Resize(fyne.NewSize(560, 400))
 	w4.SetCloseIntercept(func() { w4.Hide() })
 	w4.Canvas().AddShortcut(&desktop.CustomShortcut{
@@ -965,6 +1022,7 @@ func buildTrayMenu(a fyne.App, w4 fyne.Window) *fyne.Menu {
 			})
 		}),
 		fyne.NewMenuItem("Search...", func() { showSearchDialog(a) }),
+		fyne.NewMenuItem("Navigator...", func() { showNavigatorWindow(a) }),
 		fyne.NewMenuItem("Recurring Items...", func() {
 			showRecurringItemsDialog(a, w4)
 		}),
