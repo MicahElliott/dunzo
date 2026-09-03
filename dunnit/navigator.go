@@ -86,11 +86,13 @@ func parseNavigatorTagsInput(text string) []string {
 // showNavigatorWindow opens the "Navigator" -- a browse/search window
 // over all ledger history. Combines three composable filters
 // (category, tags, date range) built on the shared LedgerQuery/
-// FilterLedgerEntries layer (ledgerquery.go), plus an "Ask AI about
-// these" action that feeds the currently-filtered entries into
-// summarizeWithCopilotPrompt with a free-form question -- see
-// docs/navigator-design.md for the fuller design discussion and
-// planned next steps (report-corpus search, histograms).
+// FilterLedgerEntries layer (ledgerquery.go), plus "Ask AI about
+// these" (feeds the currently-filtered entries into
+// summarizeWithCopilotPrompt with a free-form question) and
+// "Histogram..." (a plain-text per-category bar chart of the current
+// filtered set, formatCategoryHistogram) -- see docs/navigator-design.md
+// for the fuller design discussion and remaining open items
+// (report-corpus search now lives in reportslibrary.go).
 //
 // EODOnly categories are included in the category dropdown (unlike
 // showHelp's picker-oriented legend) -- Navigator is about browsing
@@ -158,6 +160,9 @@ func showNavigatorWindow(a fyne.App) {
 	askAIBtn := widget.NewButton("Ask AI about these...", func() {
 		showNavigatorAskAIDialog(a, w, currentEntries)
 	})
+	histogramBtn := widget.NewButton("Histogram...", func() {
+		showNavigatorHistogramWindow(a, currentEntries)
+	})
 
 	filterRow := container.NewBorder(nil, nil,
 		widget.NewLabel("Category:"), nil,
@@ -168,7 +173,7 @@ func showNavigatorWindow(a fyne.App) {
 
 	content := container.NewVBox(
 		filterRow,
-		container.NewBorder(nil, nil, nil, askAIBtn, countLabel),
+		container.NewBorder(nil, nil, nil, container.NewHBox(histogramBtn, askAIBtn), countLabel),
 		results,
 	)
 
@@ -287,4 +292,68 @@ func sortedCategoryCounts(counts map[string]int) []string {
 		return cats[i] < cats[j]
 	})
 	return cats
+}
+
+// histogramBarWidth is the max number of "*" characters used to
+// render the largest bar in formatCategoryHistogram -- every other
+// bar is scaled proportionally, so the chart fits a fixed-width
+// window regardless of how large the top count is.
+const histogramBarWidth = 40
+
+// formatCategoryHistogram renders entries' per-category counts
+// (categoryCounts/sortedCategoryCounts) as a plain-text ASCII bar
+// chart, one line per category, widest bar first -- matching
+// trend.go's existing house style (no charting library, plain text)
+// rather than introducing a new dependency for this.
+func formatCategoryHistogram(entries []LedgerEntry) string {
+	if len(entries) == 0 {
+		return "(no entries to chart)"
+	}
+	counts := categoryCounts(entries)
+	cats := sortedCategoryCounts(counts)
+
+	maxCatLen := 0
+	maxCount := 0
+	for _, c := range cats {
+		if len(c) > maxCatLen {
+			maxCatLen = len(c)
+		}
+		if counts[c] > maxCount {
+			maxCount = counts[c]
+		}
+	}
+
+	var sb strings.Builder
+	for _, c := range cats {
+		n := counts[c]
+		barLen := histogramBarWidth
+		if maxCount > 0 {
+			barLen = n * histogramBarWidth / maxCount
+		}
+		if barLen == 0 && n > 0 {
+			barLen = 1 // always show at least one char for a nonzero count
+		}
+		label := c + strings.Repeat(" ", maxCatLen-len(c))
+		sb.WriteString(label + "  " + strings.Repeat("*", barLen) + " " + strconv.Itoa(n) + "\n")
+	}
+	return sb.String()
+}
+
+// showNavigatorHistogramWindow displays entries' per-category
+// breakdown as a plain-text ASCII bar chart in its own window --
+// separate from Navigator's own window so it can stay open
+// side-by-side with the filtered browse view, same rationale as
+// showNavigatorAIAnswerWindow.
+func showNavigatorHistogramWindow(a fyne.App, entries []LedgerEntry) {
+	w := a.NewWindow("Dunzo: Navigator — Histogram")
+	body := widget.NewMultiLineEntry()
+	body.Wrapping = fyne.TextWrapOff
+	body.SetText(formatCategoryHistogram(entries))
+	w.SetContent(container.NewBorder(
+		widget.NewLabel(pluralCount(len(entries), "entry", "entries")+" by category:"),
+		nil, nil, nil,
+		body,
+	))
+	w.Resize(fyne.NewSize(480, 420))
+	w.Show()
 }
