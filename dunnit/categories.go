@@ -90,9 +90,17 @@ func GroupLabel(group string) string {
 // one of these endpoints -- not yet a structured/enforced mechanism).
 var Categories = []Category{
 	// now: day-to-day capture, plus the three endpoint categories
-	// (DONE/FAIL/WASTED) that Plan-group items resolve into.
+	// (DONE/FAIL/WASTED) that Plan-group items resolve into. ONGOING
+	// is marked EODOnly (2026-09-02) -- despite the name, it's purely
+	// an internal/mechanical marker written by Ditto's own rewrite
+	// logic (recordExtended in ui.go), never meant to be hand-picked
+	// from the live picker or explained in Help; EODOnly already
+	// means exactly "written by a dedicated internal flow, excluded
+	// from the picker and from Help" (see the EODOnly field doc
+	// above), which fits Ditto's ONGOING rewrite just as well as it
+	// fits eod.go's SUMMARY/PRODUCTIVITY/MEETING_HOURS.
 	{"✔️", "DONE", "Something you completed. The most common endpoint a \"Plan\" item (TODO/IDEA/GOAL/etc.) resolves into — see docs/category-taxonomy.md.", "now", "positive", false},
-	{"⏩", "ONGOING", "Still working on something (e.g. what \"Ditto\" now logs) — not finished yet. Purely an internal/mechanical marker (Ditto's own bookkeeping), not part of the endpoint/promotion taxonomy.", "now", "", false},
+	{"⏩", "ONGOING", "Still working on something (e.g. what \"Ditto\" logs) — not finished yet. Purely an internal/mechanical marker (Ditto's own bookkeeping), not part of the endpoint/promotion taxonomy.", "now", "", true},
 	{"🌱", "TIL", "Today I Learned — something new you picked up.", "now", "positive", false},
 	{"🙌", "KUDOS", "Recognition given to someone else, or received from someone else.", "now", "positive", false},
 	{"🏆", "WIN", "A win worth celebrating.", "now", "positive", false},
