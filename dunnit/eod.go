@@ -3,8 +3,6 @@ package dun
 import (
 	"log"
 	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,12 +16,7 @@ import (
 // for time.Now().AddDate(0, 0, 1) instead of today).
 func tomorrowLedgerPath() (string, string) {
 	tomorrow := time.Now().AddDate(0, 0, 1)
-	yr, wk := tomorrow.ISOWeek()
-	moname := tomorrow.Format("Jan")
-	fname0 := "ledger-" + tomorrow.Format("20060102") + ".txt"
-	fpath := filepath.Join(DunzoDir(), strconv.Itoa(yr), "w"+strconv.Itoa(wk)+"-"+moname)
-	fname := filepath.Join(fpath, fname0)
-	return fpath, fname
+	return ledgerPathFor(tomorrow)
 }
 
 // appendTomorrowLine appends a single pre-formatted ledger line (sans
@@ -55,20 +48,23 @@ func recordTomorrowGoals(lines []string) {
 	}
 }
 
-// carryForwardItem appends a fresh line of the given category (plain
-// re-listing, no state/history beyond what's already in today's
-// ledger) to tomorrow's ledger for an item the user chose not to
-// convert/postpone today (FR-09, extended beyond just TODO to also
-// cover QUESTION carry-forward).
-func carryForwardItem(category, text string) {
-	appendTomorrowLine("[05:00] " + category + " " + text)
-}
-
-// eodOpenItemsSection builds one carry-forward-checkbox section (used
-// for both TODO and QUESTION) of showEODWindow: a checkbox per still-
-// open item of the given category, checked by default, so the user
-// can carry it forward into tomorrow's ledger -- or uncheck to leave
-// it behind on purpose (not forced).
+// eodOpenItemsSection builds one Postpone-opt-out checkbox section
+// (used for both TODO and QUESTION) of showEODWindow: a checkbox per
+// still-open item of the given category, UNCHECKED by default.
+//
+// Naming/semantics note (2026-09-02, see
+// docs/todo-carryforward-design.md): this used to be a "carry
+// forward" section (checked = copy to tomorrow), back when carry-
+// forward was something the user had to opt into here. Now that
+// unresolved items copy forward *automatically* every day
+// (runCarryForwardIfNeeded, carryforward.go) regardless of whether
+// EOD is ever opened, this section's job flipped: it's now the
+// explicit **opt-out** -- checking a box here Postpones that item
+// (recordPostponed, into SOMEDAY) so it stops being copied forward
+// tomorrow and every day after, rather than copying it forward itself
+// (which would now double up with the automatic copy). Leaving
+// everything unchecked (the default) is a complete no-op here --
+// automatic carry-forward already handles it.
 func eodOpenItemsSection(category string) (box *fyne.Container, items []OpenItem, checks []*widget.Check) {
 	for _, item := range getOpenItems() {
 		if item.Category == category {
@@ -78,8 +74,8 @@ func eodOpenItemsSection(category string) (box *fyne.Container, items []OpenItem
 	box = container.NewVBox()
 	checks = make([]*widget.Check, len(items))
 	for i, item := range items {
-		c := widget.NewCheck(item.Text, nil)
-		c.SetChecked(true)
+		c := widget.NewCheck(stripCarryForwardSince(item.Text)+staleBadge(item.Text), nil)
+		c.SetChecked(false)
 		checks[i] = c
 		box.Add(c)
 	}
@@ -136,14 +132,23 @@ func showEODWindow(a fyne.App) {
 	}
 	summaryPreviewScroll := container.NewVScroll(summaryPreview)
 	summaryPreviewScroll.SetMinSize(fyne.NewSize(0, 160))
+	// copySummaryBtn copies the raw (unrendered) summary text to the
+	// clipboard -- e.g. for pasting into Slack/email/a status doc
+	// elsewhere. Same a.Clipboard().SetContent pattern used by every
+	// other "Copy" action in this codebase (Summarize, Status Report,
+	// Annual Review, etc).
+	copySummaryBtn := widget.NewButton("Copy", func() {
+		a.Clipboard().SetContent(summary.Text)
+	})
 	summaryBox := container.NewVBox(
 		summary,
 		widget.NewLabelWithStyle("Preview:", fyne.TextAlignLeading, fyne.TextStyle{Italic: true}),
 		summaryPreviewScroll,
+		copySummaryBtn,
 	)
 	go func() {
 		ledgerText := gatherLedgerTextForDate(time.Now())
-		if strings.TrimSpace(ledgerText) == "" {
+		if !hasRealLedgerContent(ledgerText) {
 			return
 		}
 		draft, err := summarizeWithCopilotPrompt(
@@ -176,8 +181,11 @@ func showEODWindow(a fyne.App) {
 	goals.SetPlaceHolder("Any goals for tomorrow? One per line\u2026")
 	goals.SetMinRowsVisible(3)
 
-	// FR-09 (extended): open TODOs and QUESTIONs each get their own
-	// carry-forward checkbox section.
+	// (2026-09-02, see docs/todo-carryforward-design.md): open TODOs
+	// and QUESTIONs each get their own Postpone-opt-out checkbox
+	// section -- checking a box here sends that item to SOMEDAY
+	// instead of letting it carry forward automatically tomorrow (see
+	// eodOpenItemsSection's doc comment for the full rationale).
 	todoBox, openTodos, todoChecks := eodOpenItemsSection("TODO")
 	questionBox, openQuestions, questionChecks := eodOpenItemsSection("QUESTION")
 
@@ -190,10 +198,10 @@ func showEODWindow(a fyne.App) {
 		widget.NewFormItem("Tomorrow's Goals", goals),
 	}
 	if len(openTodos) > 0 {
-		items = append(items, widget.NewFormItem("Carry Forward Open TODOs", todoBox))
+		items = append(items, widget.NewFormItem("Postpone Open TODOs", todoBox))
 	}
 	if len(openQuestions) > 0 {
-		items = append(items, widget.NewFormItem("Carry Forward Open QUESTIONs", questionBox))
+		items = append(items, widget.NewFormItem("Postpone Open QUESTIONs", questionBox))
 	}
 	form := widget.NewForm(items...)
 	form.SubmitText = "Finalize Day"
@@ -212,12 +220,12 @@ func showEODWindow(a fyne.App) {
 		}
 		for i, item := range openTodos {
 			if todoChecks[i].Checked {
-				carryForwardItem("TODO", item.Text)
+				recordPostponed(item)
 			}
 		}
 		for i, item := range openQuestions {
 			if questionChecks[i].Checked {
-				carryForwardItem("QUESTION", item.Text)
+				recordPostponed(item)
 			}
 		}
 		// FR-18: draft (if not already present) today's hand-editable
@@ -246,7 +254,7 @@ func showEODWindow(a fyne.App) {
 		w.Close()
 	}
 
-	w.SetContent(container.NewVScroll(form))
+	w.SetContent(windowPad(container.NewVScroll(form)))
 	w.Resize(fyne.NewSize(560, 980))
 	w.Show()
 }

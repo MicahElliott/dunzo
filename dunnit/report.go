@@ -54,11 +54,11 @@ func showGeneratedReport(a fyne.App, title, savePath, text string) {
 		dialog.ShowInformation("Saved", "Saved to "+savePath, w)
 	})
 
-	w.SetContent(container.NewBorder(nil,
+	w.SetContent(windowPad(container.NewBorder(nil,
 		container.NewHBox(copyBtn, saveBtn, widget.NewButton("Close", func() { w.Close() })),
 		nil, nil,
 		scroll,
-	))
+	)))
 	w.Resize(fyne.NewSize(520, 420))
 	w.Show()
 }
@@ -125,7 +125,7 @@ func showEditableReportWindow(a fyne.App, title, savePath, initialText string) {
 		nil, nil,
 		editorScroll,
 	)
-	w.SetContent(content)
+	w.SetContent(windowPad(content))
 	w.Resize(fyne.NewSize(640, 720))
 	w.Show()
 }

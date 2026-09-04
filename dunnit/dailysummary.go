@@ -3,17 +3,16 @@ package dun
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
 // dailySummaryPath returns the path for date's markdown summary doc
 // (FR-18), living alongside that date's ledger file in the same
-// year/week/month directory (same naming scheme as getLedger, just
+// year/month/week directory (same naming scheme as getLedger, just
 // "summary-" instead of "ledger-" and ".md" instead of ".txt").
 func dailySummaryPath(date time.Time) (dir, path string) {
-	yr, wk := date.ISOWeek()
-	moname := date.Format("Jan")
-	dir = ledgerDirFor(yr, wk, moname)
+	dir, _ = ledgerPathFor(date)
 	path = filepath.Join(dir, "summary-"+date.Format("20060102")+".md")
 	return dir, path
 }
@@ -22,12 +21,38 @@ func dailySummaryPath(date time.Time) (dir, path string) {
 // summary doc via the existing gh copilot pipeline (summarize.go),
 // scoped to just that single day's ledger. Returns "" (with the
 // error) if there's nothing to summarize or the copilot call fails.
+//
+// hasRealLedgerContent (not a bare "" check) guards the copilot call:
+// gatherLedgerTextForDate/concatLedgerFiles always emit a
+// "# ledger-....txt" header line for any file that exists, even one
+// with zero actual entries in it -- a bare emptiness check on that
+// result is therefore always false (non-empty) even when there's
+// nothing real to summarize, which previously let a near-empty ledger
+// through to gh copilot and got back a confused response describing
+// the missing content instead of a real summary (real bug, hit via
+// both auto-draft-at-EOD and the manual "Daily Summary Doc..." tray
+// item).
 func draftDailySummary(date time.Time) (string, error) {
 	ledgerText := gatherLedgerTextForDate(date)
-	if ledgerText == "" {
+	if !hasRealLedgerContent(ledgerText) {
 		return "", nil
 	}
 	return summarizeWithCopilot(ledgerText)
+}
+
+// hasRealLedgerContent reports whether ledgerText (as produced by
+// concatLedgerFiles/gatherLedgerTextForDate) contains at least one
+// real entry line, as opposed to just "# filename" header line(s)
+// with nothing beneath them.
+func hasRealLedgerContent(ledgerText string) bool {
+	for _, line := range strings.Split(ledgerText, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "# ") {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 // ensureDailySummaryDoc creates today's (or the given date's) summary

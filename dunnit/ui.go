@@ -14,7 +14,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strconv"
 
@@ -27,25 +26,7 @@ import (
 
 // Get today's ledger file path and name.
 func getLedger() (string, string) {
-	yr, wk := time.Now().ISOWeek()
-	// mo := time.Now().Month()
-	t := time.Now().UTC()
-	tn := time.Now()
-	yr8 := tn.Format("20060102")
-	moname := t.Format("Jan")
-	fname0 := "ledger-" + yr8 + ".txt"
-	fpath := filepath.Join(DunzoDir(),
-		strconv.Itoa(yr), "w"+strconv.Itoa(wk)+"-"+moname)
-	fname := filepath.Join(fpath, fname0)
-	return fpath, fname
-}
-
-// ledgerDirFor returns the year/week/month directory (same scheme as
-// getLedger) for the given ISO year/week and month abbreviation --
-// factored out so other date-scoped files (e.g. FR-18's daily
-// summary docs) can share the exact same path layout as ledgers.
-func ledgerDirFor(yr, wk int, moname string) string {
-	return filepath.Join(DunzoDir(), strconv.Itoa(yr), "w"+strconv.Itoa(wk)+"-"+moname)
+	return ledgerPathFor(time.Now())
 }
 
 // lastActivityAt tracks the wall-clock time of the most recent
@@ -145,7 +126,20 @@ func defaultSnoozeDuration() time.Duration {
 	return time.Duration(minutes) * time.Minute
 }
 
+// RecordActivity is recordActivity's exported form, for callers
+// outside this package (currently just cmd/dunnit's CLI, see
+// docs/cli-design.md or the CLI's own doc comment) that want to
+// append a ledger entry the same way Daybook's Save button does --
+// same carry-forward trigger, same tag-cache invalidation, same
+// ledger-index invalidation. Does NOT validate that category is a
+// real Category code; callers should check that themselves (see
+// CategoryExists in categories.go) before calling.
+func RecordActivity(text, category string) {
+	recordActivity(text, category)
+}
+
 func recordActivity(text, category string) {
+	runCarryForwardIfNeeded()
 	text = strings.TrimSpace(text)
 	log.Println("Content was:", text)
 	fpath, fname := getLedger()
@@ -326,7 +320,7 @@ func showHelp(a fyne.App) {
 	}
 	scroll := container.NewVScroll(rows)
 	scroll.SetMinSize(fyne.NewSize(560, 340))
-	w.SetContent(scroll)
+	w.SetContent(windowPad(scroll))
 	w.Show()
 }
 
@@ -350,7 +344,7 @@ func MakeUI() *fyne.App {
 // first and invoke onClose directly; anything else falls through to
 // the embedded Entry's normal shortcut handling (cut/copy/paste etc).
 type closeShortcutEntry struct {
-	widget.Entry
+	tagAutoEntry
 	closeKey fyne.KeyName
 	closeMod fyne.KeyModifier
 	onClose  func()
@@ -359,6 +353,7 @@ type closeShortcutEntry struct {
 func newCloseShortcutEntry(closeKey fyne.KeyName, closeMod fyne.KeyModifier, onClose func()) *closeShortcutEntry {
 	e := &closeShortcutEntry{closeKey: closeKey, closeMod: closeMod, onClose: onClose}
 	e.ExtendBaseWidget(e)
+	e.initTagAutoEntry()
 	return e
 }
 
@@ -368,7 +363,7 @@ func (e *closeShortcutEntry) TypedShortcut(shortcut fyne.Shortcut) {
 		e.onClose()
 		return
 	}
-	e.Entry.TypedShortcut(shortcut)
+	e.tagAutoEntry.TypedShortcut(shortcut)
 }
 
 // BuildMainWindow constructs the main Dunzo entry window and tray menu,
@@ -377,6 +372,7 @@ func (e *closeShortcutEntry) TypedShortcut(shortcut fyne.Shortcut) {
 // (e.g. the scheduler) can Show()/RequestFocus() it later.
 func BuildMainWindow(a fyne.App) fyne.Window {
 	a.Settings().SetTheme(newCompactTheme())
+	runCarryForwardIfNeeded()
 	cfg := LoadConfig()
 
 	w4 := a.NewWindow("Dunzo: Daybook")
@@ -393,65 +389,21 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// input.Resize(fyne.NewSize(100.0, 50.0))
 
 	// Tag autocomplete (FR-10): as the user types a "#tag" fragment,
-	// show a popup of matching previously-used tags (scanned from
+	// show suggestions of matching previously-used tags (scanned from
 	// ledger history, cached -- see tags.go). Selecting an entry
-	// replaces the in-progress fragment with the full tag.
+	// (via Up/Down + Enter, or a mouse click) replaces the in-progress
+	// fragment with the full tag.
 	//
-	// Built on plain widget.PopUp (not widget.PopUpMenu, the original
-	// 2026-08-xx implementation) -- PopUpMenu.Show() unconditionally
-	// steals keyboard focus via canvas.Focus(p), and its TypedRune is
-	// a no-op, so every keystroke after the popup appeared went to
-	// the (non-reacting) menu instead of `input`, requiring an
-	// explicit Esc (PopUpMenu.TypedKey's only path back out) before
-	// another letter could be typed -- effectively broken multi-
-	// letter typing (2026-09-02 bug report: "feels fully broken").
-	// The refocus-via-fyne.Do workaround below tried to fight this
-	// every keystroke but evidently lost the race often enough in
-	// practice. Plain widget.PopUp's Show() does not call
-	// canvas.Focus() at all, so `input` never loses focus in the
-	// first place -- selecting a suggestion is done by mouse click on
-	// one of the popup's plain buttons instead of PopUpMenu's
-	// keyboard-navigable menu items (a small capability trade-off,
-	// but keyboard typing into `input` working correctly matters far
-	// more than keyboard-navigating the suggestion list itself).
-	var tagPopup *widget.PopUp
-	dismissTagPopup := func() {
-		if tagPopup != nil {
-			tagPopup.Hide()
-			tagPopup = nil
-		}
-	}
-	input.OnChanged = func(text string) {
-		dismissTagPopup()
-		start, fragment, ok := currentTagFragment(text, input.CursorColumn)
-		if !ok || len(fragment) < 2 { // need at least "#" + 1 char
-			return
-		}
-		matches := matchingTags(KnownTags(), fragment[1:])
-		if len(matches) == 0 {
-			return
-		}
-		canvas := fyne.CurrentApp().Driver().CanvasForObject(input)
-		if canvas == nil {
-			return
-		}
-		box := container.NewVBox()
-		for _, tag := range matches {
-			tag := tag // capture
-			box.Add(widget.NewButton(tag, func() {
-				runes := []rune(text)
-				newText := string(runes[:start]) + tag + string(runes[input.CursorColumn:])
-				input.SetText(newText)
-				input.CursorColumn = start + len([]rune(tag))
-				input.Refresh()
-				dismissTagPopup()
-				canvas.Focus(input)
-			}))
-		}
-		tagPopup = widget.NewPopUp(box, canvas)
-		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(input)
-		tagPopup.ShowAtPosition(pos.Add(fyne.NewPos(0, input.Size().Height)))
-	}
+	// This is `input`'s built-in tagAutoEntry behavior (tagautoentry.go)
+	// -- see that file's doc comment for why the previous two attempts
+	// (widget.PopUpMenu, then plain widget.PopUp) were both fundamentally
+	// broken: ANY canvas overlay steals all keyboard routing away from
+	// `input` the moment it exists, regardless of explicit refocus
+	// calls, which is why typing past the first letter -- and even
+	// Escape -- stopped working. inputSuggestions is added to the
+	// surrounding layout, immediately below input's row, as a plain
+	// sibling widget (no overlay).
+	inputSuggestions := input.SuggestionBox()
 
 	// minsInput is an optional free-text "minutes spent" field (very
 	// informal time tracking). When non-empty and numeric, its value
@@ -464,6 +416,21 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	minsInput := widget.NewEntry()
 	minsInput.SetPlaceHolder("mins")
 	minsWrapper := container.NewGridWrap(fyne.NewSize(64, minsInput.MinSize().Height), minsInput)
+
+	// setMinsWrapperVisibility shows/hides the mins field based on
+	// whether the currently selected category is time-trackable (see
+	// IsTimeTrackable/timeTrackableCategories, categories.go) --
+	// added 2026-09-03 so the mins box only ever appears for DONE/
+	// FAIL/WASTED (completed-effort entries), never for "Plan"-group
+	// items like TODO/GOAL where a mins value would misleadingly read
+	// as a time *estimate* rather than an actual duration.
+	setMinsWrapperVisibility := func(cat string) {
+		if IsTimeTrackable(cat) {
+			minsWrapper.Show()
+		} else {
+			minsWrapper.Hide()
+		}
+	}
 
 	// withMins appends " @Nm" to text if minsInput has a valid
 	// positive integer in it; otherwise returns text unchanged.
@@ -497,38 +464,50 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// chosen bucket active every time Daybook pops up, not sticky
 	// last-used state) and is added to the groupFilter dropdown's
 	// options; otherwise behaves exactly as before (defaults to
-	// "Now", no Faves option shown at all).
+	// "End", no Faves option shown at all).
 	faves := CategoryLabelsForFaves(cfg)
-	defaultGroupFilter := "Now"
-	defaultGroupOptions := []string{"Now", "Plan", "Reflect", "All"}
-	defaultCategoryOptions := CategoryLabelsForGroup("now")
+	defaultGroupFilter := "End"
+	defaultGroupOptions := []string{"End", "Plan", "Hilite"}
+	defaultCategoryOptions := CategoryLabelsForGroup(cfg, "end")
 	if len(faves) > 0 {
 		defaultGroupFilter = "Faves"
-		defaultGroupOptions = []string{"Faves", "Now", "Plan", "Reflect", "All"}
+		defaultGroupOptions = []string{"Faves", "End", "Plan", "Hilite"}
 		defaultCategoryOptions = faves
 	}
 
-	category := widget.NewSelect(defaultCategoryOptions,
+	// category is a hoverSelect (not a plain widget.Select) so
+	// hovering it shows the currently-selected category's Help text
+	// (Category.Help, categories.go) as a tooltip -- reusing the same
+	// string shown in the Help window's legend, so the two can never
+	// drift out of sync.
+	category := newHoverSelect(defaultCategoryOptions,
 		func(cat string) {
 			fmt.Println("saw a category:", cat)
 			res := strings.Split(cat, " ")
 			// selectedCat = cat
 			selectedCat = res[1]
-		})
+			setMinsWrapperVisibility(selectedCat)
+		},
+		func() string { return HelpForCode(selectedCat) })
 	category.SetSelected(defaultCategoryOptions[0])
 
 	// groupFilter narrows the category picker to a subset (FR-06
 	// follow-up): "Faves" (user-configured, see
 	// Config.FavoriteCategories -- shown/default only if configured),
-	// "now" (day-to-day capture), "plan" (future-facing), "reflect"
-	// (retrospective/EOD-ish), or "all". Purely a UI convenience over
-	// the same Categories list.
+	// "end" (day-to-day capture), "plan" (future-facing), or "hilite"
+	// (notable-moment callouts). Purely a UI convenience over
+	// the same Categories list. (An "All" option existed here
+	// previously but was removed -- Micah didn't see a strong need
+	// for it given Faves/End/Plan/Hilite already cover the picker's
+	// practical use cases; CategoryLabelsForGroup itself still
+	// supports "" / "all" as "every category" for any other caller
+	// that wants it.)
 	groupFilter := widget.NewSelect(defaultGroupOptions,
 		func(g string) {
 			if g == "Faves" {
 				category.Options = faves
 			} else {
-				category.Options = CategoryLabelsForGroup(strings.ToLower(g))
+				category.Options = CategoryLabelsForGroup(cfg, strings.ToLower(g))
 			}
 			category.SetSelected(category.Options[0])
 			category.Refresh()
@@ -548,18 +527,32 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// order matches visual left-to-right order) while still letting
 	// `input` stretch to fill available width like NewBorder's center
 	// content would have.
+	// saveBtn is created here (empty OnTapped, filled in once saveEntry
+	// is defined further below -- it needs refreshOpenItems/
+	// refreshCompleted/refreshReflections/refreshLastDone, which
+	// aren't defined yet at this point) so it can sit in doneWrapper's
+	// row (right of minsWrapper), matching Tab/visual order -- see
+	// doneWrapper's comment below.
+	saveBtn := widget.NewButton("Save", nil)
+
 	// doneWrapper is the main entry row (groupFilter/category/input/
-	// minsWrapper) -- Daybook's single most important row, where
-	// virtually every interaction starts. Window-edge spacing is now
-	// handled once, uniformly, by the outer contentPad wrap below
-	// (see its comment) -- this local wrap only adds a bit of extra
-	// *bottom* padding to visually separate this row from
-	// commonTagsRow underneath it, since it's the primary piece of
-	// Daybook and deserves to stand apart from the rest. Value is an
-	// arbitrary "looks reasonable" pick, not theme-driven -- adjust
-	// here if it looks off.
+	// minsWrapper/saveBtn) -- Daybook's single most important row,
+	// where virtually every interaction starts. Save sits at the end
+	// of this row (not in a separate buttons row) since it's the most
+	// important action and belongs right next to what it saves; this
+	// also means Tab from input/minsInput naturally lands on Save
+	// next (stretchRowLayout preserves Objects slice order for
+	// Tab/Shift+Tab focus, matching visual left-to-right order -- see
+	// its own comment above). Window-edge spacing is now handled
+	// once, uniformly, by the outer contentPad wrap below (see its
+	// comment) -- this local wrap only adds a bit of extra *bottom*
+	// padding to visually separate this row from commonTagsRow
+	// underneath it, since it's the primary piece of Daybook and
+	// deserves to stand apart from the rest. Value is an arbitrary
+	// "looks reasonable" pick, not theme-driven -- adjust here if it
+	// looks off.
 	doneWrapper := container.New(layout.NewCustomPaddedLayout(0, 6, 0, 0),
-		container.New(newStretchRowLayout(input), groupFilter, category, input, minsWrapper))
+		container.New(newStretchRowLayout(input), groupFilter, category, input, minsWrapper, saveBtn))
 
 	fmt.Println(input.MinSize())
 
@@ -583,6 +576,11 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// overwhelming; a "Show all" / "Show TODOs only" toggle button
 	// reveals/hides the rest without losing them.
 	showAllPlanned := false
+	// showExcludedPlanned toggles whether items whose leading tag is
+	// in Config.ReportExcludeTags are shown -- default false, same
+	// "hidden behind a toggle rather than gone" pattern as
+	// showAllPlanned, but for tag-based noise rather than category.
+	showExcludedPlanned := false
 	refreshOpenItems = func() {
 		openItemsBox.RemoveAll()
 		items := getOpenItems()
@@ -591,6 +589,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 			openItemsBox.Refresh()
 			return
 		}
+		excludeTags := LoadConfig().ReportExcludeTags
 		addRow := func(item OpenItem) {
 			// Icon-only widget.NewButtonWithIcon (empty label), not
 			// newHoverIconButton -- this Planned section specifically
@@ -611,6 +610,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 						fyne.Do(func() {
 							refreshOpenItems()
 							itemsAccordion.Refresh()
+							showToast(w4.Canvas(), "Discarded")
 						})
 					}),
 					widget.NewButtonWithIcon("", theme.Icon(theme.IconNameHistory), func() { // "Postpone"
@@ -618,6 +618,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 						fyne.Do(func() {
 							refreshOpenItems()
 							itemsAccordion.Refresh()
+							showToast(w4.Canvas(), "Postponed (to SOMEDAY)")
 						})
 					}),
 					widget.NewButtonWithIcon("", theme.Icon(theme.IconNameConfirm), func() { // "Done"
@@ -627,6 +628,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 							refreshCompleted()
 							refreshLastDone()
 							itemsAccordion.Refresh()
+							showToast(w4.Canvas(), "Done")
 						})
 					}),
 					widget.NewButtonWithIcon("", theme.Icon(theme.IconNameDocumentCreate), func() { // "Edit"
@@ -638,20 +640,31 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 						})
 					}),
 				),
-				widget.NewLabel("\u2022 "+item.Text))
+				itemTextLabel("\u2022 "+stripCarryForwardSince(item.Text)+staleBadge(item.Text)))
 			openItemsBox.Add(row)
 		}
 		cats, grouped := groupOpenItemsByCategory(items)
 		otherCount := 0
+		excludedCount := 0
+		addCatRows := func(cat string) {
+			openItemsBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
+			visible, excluded := splitExcludedTagItems(grouped[cat], excludeTags)
+			excludedCount += len(excluded)
+			for _, item := range visible {
+				addRow(item)
+			}
+			if showExcludedPlanned {
+				for _, item := range excluded {
+					addRow(item)
+				}
+			}
+		}
 		for _, cat := range cats {
 			if cat != "TODO" {
 				otherCount += len(grouped[cat])
 				continue
 			}
-			openItemsBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
-			for _, item := range grouped[cat] {
-				addRow(item)
-			}
+			addCatRows(cat)
 		}
 		if otherCount > 0 {
 			toggleLabel := fmt.Sprintf("Show all (%d more)", otherCount)
@@ -668,37 +681,70 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 					if cat == "TODO" {
 						continue
 					}
-					openItemsBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
-					for _, item := range grouped[cat] {
-						addRow(item)
-					}
+					addCatRows(cat)
 				}
+				// SOMEDAY items (postponed via the "Postpone" action
+				// above) deliberately stop appearing in Planned once
+				// postponed (see docs/todo-carryforward-design.md),
+				// so this button is the discoverable escape hatch
+				// back to them, placed at the bottom of the expanded
+				// "Show all" view rather than its own always-visible
+				// row.
+				openItemsBox.Add(widget.NewButton("Browse SOMEDAY Items...", func() {
+					showSomedayBrowserWindow(a)
+				}))
 			}
+		}
+		// Excluded-tag items (Config.ReportExcludeTags) are hidden by
+		// default -- surfaced via their own toggle at the very bottom
+		// of the section, below even the "Show all"/SOMEDAY controls,
+		// since they're the lowest-priority tier of all (see
+		// splitExcludedTagItems's doc comment).
+		if excludedCount > 0 {
+			excludedToggleLabel := fmt.Sprintf("Show excluded-tag items (%d more)", excludedCount)
+			if showExcludedPlanned {
+				excludedToggleLabel = "Hide excluded-tag items"
+			}
+			openItemsBox.Add(widget.NewButton(excludedToggleLabel, func() {
+				showExcludedPlanned = !showExcludedPlanned
+				refreshOpenItems()
+				itemsAccordion.Refresh()
+			}))
 		}
 		openItemsBox.Refresh()
 	}
 	refreshOpenItems()
 
-	// completedBox displays today's "now"-group entries (DONE/ONGOING/
-	// TIL/KUDOS/WIN -- not just DONE) grouped by category with
-	// per-category sub-headings, mirroring how Planned already splits
+	// completedBox displays today's "end"-group entries (DONE/ONGOING/
+	// FAIL/WASTED) grouped by category with per-category
+	// sub-headings, mirroring how Planned already splits
 	// TODO/GOAL/etc into their own sections (see groupOpenItemsByCategory).
 	// Also collapsible, placed right below Planned in the same accordion.
-	// Section is labeled "Activity" (not "Completed") since it covers
-	// all "now" cats, not just finished/DONE ones.
+	// Section is labeled "Endings" (not "Completed"/"Activity") since
+	// it covers all "end" cats -- the terminal states a Plan item
+	// resolves into -- not just finished/DONE ones.
 	completedBox := container.NewVBox()
+	showExcludedCompleted := false
 	refreshCompleted = func() {
 		completedBox.RemoveAll()
-		items := getCategoryGroupItems("now")
+		items := getCategoryGroupItems("end")
 		if len(items) == 0 {
 			completedBox.Add(widget.NewLabel("Nothing logged yet today."))
 			completedBox.Refresh()
 			return
 		}
-		cats, grouped := groupCategoryItemsByGroup("now", items)
+		excludeTags := LoadConfig().ReportExcludeTags
+		cats, grouped := groupCategoryItemsByGroup("end", items)
+		excludedCount := 0
 		for _, cat := range cats {
 			completedBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
-			for _, item := range grouped[cat] {
+			visible, excluded := splitExcludedTagItems(grouped[cat], excludeTags)
+			excludedCount += len(excluded)
+			shown := visible
+			if showExcludedCompleted {
+				shown = append(append([]OpenItem{}, visible...), excluded...)
+			}
+			for _, item := range shown {
 				item := item // capture
 				row := container.NewBorder(nil, nil, nil,
 					widget.NewButtonWithIcon("", theme.Icon(theme.IconNameDocumentCreate), func() { // "Edit"
@@ -710,35 +756,55 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 							})
 						})
 					}),
-					widget.NewLabel("\u2022 "+item.Text))
+					itemTextLabel("\u2022 "+item.Text))
 				completedBox.Add(row)
 			}
+		}
+		if excludedCount > 0 {
+			toggleLabel := fmt.Sprintf("Show excluded-tag items (%d more)", excludedCount)
+			if showExcludedCompleted {
+				toggleLabel = "Hide excluded-tag items"
+			}
+			completedBox.Add(widget.NewButton(toggleLabel, func() {
+				showExcludedCompleted = !showExcludedCompleted
+				refreshCompleted()
+				itemsAccordion.Refresh()
+			}))
 		}
 		completedBox.Refresh()
 	}
 	refreshCompleted()
 
-	// reflectionsBox displays today's "reflect"-group entries
-	// (IMPACT/MILESTONE/CAREER/FAIL/WASTED -- excludes the EODOnly
-	// SUMMARY/PRODUCTIVITY/MEETING_HOURS codes only in the sense that
-	// those are rare to see mid-day, though if present they'd still
-	// show here; EODOnly only gates the *picker*, not this readback),
-	// grouped by category with sub-headings, same pattern as
-	// Completed/Planned.
+	// reflectionsBox displays today's "hilite"-group entries
+	// (TIL/KUDOS/WIN/PSA/OVERCOMING/INNOVATION/LEADERSHIP/IMPACT/
+	// MILESTONE/CAREER -- excludes the EODOnly SUMMARY/PRODUCTIVITY/
+	// MEETING_HOURS codes only in the sense that those are rare to
+	// see mid-day, though if present they'd still show here; EODOnly
+	// only gates the *picker*, not this readback), grouped by category
+	// with sub-headings, same pattern as Completed/Planned.
 	reflectionsBox := container.NewVBox()
+	showExcludedReflections := false
 	var refreshReflections func()
 	refreshReflections = func() {
 		reflectionsBox.RemoveAll()
-		items := getCategoryGroupItems("reflect")
+		items := getCategoryGroupItems("hilite")
 		if len(items) == 0 {
 			reflectionsBox.Add(widget.NewLabel("Nothing reflected on yet today."))
 			reflectionsBox.Refresh()
 			return
 		}
-		cats, grouped := groupCategoryItemsByGroup("reflect", items)
+		excludeTags := LoadConfig().ReportExcludeTags
+		cats, grouped := groupCategoryItemsByGroup("hilite", items)
+		excludedCount := 0
 		for _, cat := range cats {
 			reflectionsBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Italic: true}))
-			for _, item := range grouped[cat] {
+			visible, excluded := splitExcludedTagItems(grouped[cat], excludeTags)
+			excludedCount += len(excluded)
+			shown := visible
+			if showExcludedReflections {
+				shown = append(append([]OpenItem{}, visible...), excluded...)
+			}
+			for _, item := range shown {
 				item := item // capture
 				row := container.NewBorder(nil, nil, nil,
 					widget.NewButtonWithIcon("", theme.Icon(theme.IconNameDocumentCreate), func() { // "Edit"
@@ -749,9 +815,20 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 							})
 						})
 					}),
-					widget.NewLabel("\u2022 "+item.Text))
+					itemTextLabel("\u2022 "+item.Text))
 				reflectionsBox.Add(row)
 			}
+		}
+		if excludedCount > 0 {
+			toggleLabel := fmt.Sprintf("Show excluded-tag items (%d more)", excludedCount)
+			if showExcludedReflections {
+				toggleLabel = "Hide excluded-tag items"
+			}
+			reflectionsBox.Add(widget.NewButton(toggleLabel, func() {
+				showExcludedReflections = !showExcludedReflections
+				refreshReflections()
+				itemsAccordion.Refresh()
+			}))
 		}
 		reflectionsBox.Refresh()
 	}
@@ -764,8 +841,8 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// already surface the most immediately relevant info, so nothing
 	// needs to auto-expand.
 	upcomingItem := widget.NewAccordionItem("Planned", openItemsBox)
-	completedItem := widget.NewAccordionItem("Activity", completedBox)
-	reflectionsItem := widget.NewAccordionItem("Reflections", reflectionsBox)
+	completedItem := widget.NewAccordionItem("Endings", completedBox)
+	reflectionsItem := widget.NewAccordionItem("Hilites", reflectionsBox)
 	itemsAccordion = widget.NewAccordion(completedItem, upcomingItem, reflectionsItem)
 
 	saveEntry := func() {
@@ -783,14 +860,10 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	input.OnSubmitted = func(string) { saveEntry() }
 	minsInput.OnSubmitted = func(string) { saveEntry() }
 
-	buttons := container.NewHBox(
-		widget.NewButton("Save", saveEntry),
-		widget.NewButton("Snooze", func() {
-			Snooze(defaultSnoozeDuration())
-			w4.Hide()
-		}),
-		widget.NewButton("Help...", func() { showHelp(a) }),
-	)
+	// saveBtn was created earlier (empty OnTapped) so it could be
+	// placed in doneWrapper's row; wire up its actual handler now
+	// that saveEntry exists.
+	saveBtn.OnTapped = saveEntry
 
 	// lastDoneLabel shows the most recently logged DONE entry's text
 	// just below the buttons row -- a quick "what did I just finish?"
@@ -874,14 +947,30 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		widget.NewButton("Show all", func() { showAllTagsWindow(a) }),
 		frecentTagsRow)
 
+	// tangentialRow holds Snooze and Help -- both tangential to the
+	// normal capture flow (Micah: "not sure where [they go], maybe
+	// both at very bottom of window"), so they're placed at the very
+	// bottom of Daybook's content, well away from Save/the main entry
+	// row. Right-aligned via NewBorder (fine here, unlike doneWrapper
+	// -- this is the last row in the window with nothing after it, so
+	// NewBorder's Tab-order-scrambling quirk doesn't matter).
+	tangentialRow := container.NewBorder(nil, nil, nil, container.NewHBox(
+		widget.NewButton("Snooze", func() {
+			Snooze(defaultSnoozeDuration())
+			w4.Hide()
+		}),
+		widget.NewButton("Help...", func() { showHelp(a) }),
+	))
+
 	content := container.NewVBox(
 		doneWrapper,
+		inputSuggestions,
 		// category, input,
 		commonTagsRow,
-		buttons,
 		lastDoneRow,
 		widget.NewSeparator(),
 		itemsAccordion,
+		tangentialRow,
 	)
 	log.Println(content)
 
@@ -889,17 +978,18 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	// 	label1, value1, label2, value2, content)
 
 	// contentPad wraps the entire window content in fixed edge
-	// padding, independent of compactTheme's Size overrides (theme.go)
-	// -- those only affect spacing *between* sibling widgets, not the
-	// gap between the outermost content and the window frame, which
-	// is why the earlier attempt at window-edge spacing (doneWrapper's
+	// padding via the shared windowPad helper (windowpad.go) --
+	// independent of compactTheme's Size overrides (theme.go), which
+	// only affect spacing *between* sibling widgets, not the gap
+	// between the outermost content and the window frame. This is
+	// why the earlier attempt at window-edge spacing (doneWrapper's
 	// own internal CustomPaddedLayout) only visibly helped the very
 	// top row (it happens to sit flush against the window's top/left/
 	// right edges as the first VBox child) and did nothing for the
 	// left/right/bottom edges of every other section below it, or the
 	// bottom edge overall. This single outer wrap covers all edges,
 	// for every section, in one place.
-	contentPad := container.New(layout.NewCustomPaddedLayout(10, 10, 10, 10), content)
+	contentPad := windowPad(content)
 
 	w4.SetContent(contentPad)
 	w4.Resize(fyne.NewSize(560, 400))
@@ -1037,7 +1127,7 @@ func buildTrayMenu(a fyne.App, w4 fyne.Window) *fyne.Menu {
 	ledgerMenu := fyne.NewMenu("Ledger",
 		fyne.NewMenuItem("Show Today's Ledger...", func() {
 			w3 := a.NewWindow("Dunzo: Today")
-			w3.SetContent(widget.NewLabel(strings.Join(readLedgerLines(), "\n")))
+			w3.SetContent(windowPad(widget.NewLabel(strings.Join(readLedgerLines(), "\n"))))
 			w3.Resize(fyne.NewSize(500, 400))
 			w3.Show()
 		}),
@@ -1054,6 +1144,7 @@ func buildTrayMenu(a fyne.App, w4 fyne.Window) *fyne.Menu {
 		}),
 		fyne.NewMenuItem("Search...", func() { showSearchDialog(a) }),
 		fyne.NewMenuItem("Navigator...", func() { showNavigatorWindow(a) }),
+		fyne.NewMenuItem("SOMEDAY Items...", func() { showSomedayBrowserWindow(a) }),
 		fyne.NewMenuItem("Recurring Items...", func() {
 			showRecurringItemsDialog(a, w4)
 		}),

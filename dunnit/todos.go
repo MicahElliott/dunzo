@@ -1,6 +1,9 @@
 package dun
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 // OpenItem is a not-yet-resolved item pulled from today's ledger
 // (FR-07, extended for the WAITING/QUESTION/FIXME/RISK follow-up):
@@ -118,9 +121,15 @@ func getOpenItems() []OpenItem {
 
 // recordConvertedDone logs a DONE entry referencing an original open
 // item's text, marking it as resolved (FR-07). The original line is
-// left untouched (append-only ledger design).
+// left untouched (append-only ledger design). item.Text's leading
+// word is flipped to past tense first (PastTenseLeadingWord,
+// pastverb.go) -- Plan items are typically phrased as imperatives
+// ("Fix the login bug"), which reads oddly once marked DONE, so this
+// converts it to "Fixed the login bug" instead. Purely cosmetic;
+// harmless no-op if the leading word isn't a recognized/regular verb
+// (returned unchanged by PastTense in that case).
 func recordConvertedDone(item OpenItem) {
-	recordActivity(item.Text+convertedSuffix(item.Category), "DONE")
+	recordActivity(PastTenseLeadingWord(item.Text)+convertedSuffix(item.Category), "DONE")
 }
 
 // recordPostponed logs a SOMEDAY entry referencing an original open
@@ -144,7 +153,12 @@ func recordDiscarded(item OpenItem) {
 // openTrackedCategories order, and skips empty buckets. Shared by
 // Daybook's Upcoming section, SOD, and SOM so all three list open
 // items (TODO/GOAL/WAITING/QUESTION/FIXME/RISK) the same way, rather
-// than each hardcoding its own TODO-vs-GOAL binary split.
+// than each hardcoding its own TODO-vs-GOAL binary split. Within each
+// category bucket, items are ordered by leading tag (see
+// leadingTagSortKey) rather than left in ledger/first-seen order --
+// grouping same-tagged items together makes a category's items
+// easier to scan when several distinct projects/tags are mixed
+// together within it.
 func groupOpenItemsByCategory(items []OpenItem) (categories []string, grouped map[string][]OpenItem) {
 	grouped = make(map[string][]OpenItem)
 	for _, item := range items {
@@ -153,9 +167,80 @@ func groupOpenItemsByCategory(items []OpenItem) (categories []string, grouped ma
 	for _, cat := range openTrackedCategories {
 		if len(grouped[cat]) > 0 {
 			categories = append(categories, cat)
+			sortItemsByLeadingTag(grouped[cat])
 		}
 	}
 	return categories, grouped
+}
+
+// leadingTagSortKey returns the first #tag found in text (per
+// extractTags), or "" if text has no tag -- used to sort items within
+// a category bucket so same-tagged items cluster together.
+func leadingTagSortKey(text string) string {
+	tags := extractTags(text)
+	if len(tags) == 0 {
+		return ""
+	}
+	return tags[0]
+}
+
+// sortItemsByLeadingTag sorts items in place by leadingTagSortKey,
+// tagged items first (alphabetically by tag), untagged items
+// (empty key) last -- the opposite of plain string comparison's
+// default "" first ordering, since untagged items are meant to read
+// as lower-priority/less-organized than anything with a tag. Stable,
+// so items sharing a tag (or both untagged) keep their original
+// relative (ledger/first-seen) order.
+func sortItemsByLeadingTag(items []OpenItem) {
+	sort.SliceStable(items, func(i, j int) bool {
+		a, b := leadingTagSortKey(items[i].Text), leadingTagSortKey(items[j].Text)
+		if a == "" && b == "" {
+			return false
+		}
+		if a == "" {
+			return false // untagged never sorts before a tagged item
+		}
+		if b == "" {
+			return true // tagged always sorts before an untagged item
+		}
+		return a < b
+	})
+}
+
+// isExcludedTagItem reports whether item's leading tag
+// (leadingTagSortKey) matches one of excludeTags (case-insensitive,
+// same normalization as summarize.go's lineHasExcludedTag) -- used to
+// push items tagged with a user-configured "noise" tag
+// (Config.ReportExcludeTags) below even the untagged items in
+// Planned/Endings/Hilites, hidden by default behind a "Show all"
+// toggle (mirroring Planned's existing non-TODO-category toggle).
+// Untagged items are never excluded regardless of excludeTags.
+func isExcludedTagItem(text string, excludeTags []string) bool {
+	tag := leadingTagSortKey(text)
+	if tag == "" || len(excludeTags) == 0 {
+		return false
+	}
+	for _, ex := range excludeTags {
+		if strings.EqualFold(tag, ex) {
+			return true
+		}
+	}
+	return false
+}
+
+// splitExcludedTagItems partitions items (already sorted via
+// sortItemsByLeadingTag) into visible (shown by default) and excluded
+// (leading tag matches excludeTags, hidden behind a "Show all"
+// toggle), preserving each side's relative order.
+func splitExcludedTagItems(items []OpenItem, excludeTags []string) (visible, excluded []OpenItem) {
+	for _, item := range items {
+		if isExcludedTagItem(item.Text, excludeTags) {
+			excluded = append(excluded, item)
+		} else {
+			visible = append(visible, item)
+		}
+	}
+	return visible, excluded
 }
 
 // categoryPlural returns a simple plural label for a category code,
@@ -209,7 +294,7 @@ func getCompletedItems() []string {
 }
 
 // categoryGroupOrder returns the category codes belonging to group
-// ("now"/"plan"/"reflect"), in Categories' declared order -- the
+// ("end"/"plan"/"hilite"), in Categories' declared order -- the
 // canonical per-group ordering used to keep Daybook's Completed/
 // Planned/Reflections sub-headings consistent with categories.go
 // rather than each section re-deriving its own order.
@@ -224,8 +309,8 @@ func categoryGroupOrder(group string) []string {
 }
 
 // getCategoryGroupItems returns today's entries whose category
-// belongs to group ("now"/"reflect"), in first-seen order. Used by
-// Daybook's Completed ("now") and Reflections ("reflect") sections --
+// belongs to group ("end"/"hilite"), in first-seen order. Used by
+// Daybook's Completed ("end") and Reflections ("hilite") sections --
 // the general-purpose sibling of getOpenItems, which is specific to
 // openTrackedCategories ("plan"). Strips the "(via CATEGORY)" suffix
 // (see convertedSuffix) from DONE entries converted from an open
@@ -253,9 +338,10 @@ func getCategoryGroupItems(group string) []OpenItem {
 // groupCategoryItemsByGroup buckets items (as returned by
 // getCategoryGroupItems) by category, preserving group's
 // categoryGroupOrder and skipping empty buckets -- the general-
-// purpose sibling of groupOpenItemsByCategory, letting Completed and
-// Reflections show per-category sub-headings the same way Planned
-// already does.
+// purpose sibling of groupOpenItemsByCategory, letting Endings and
+// Hilites show per-category sub-headings the same way Planned
+// already does. Also sorts each bucket by leading tag, same as
+// groupOpenItemsByCategory (see sortItemsByLeadingTag).
 func groupCategoryItemsByGroup(group string, items []OpenItem) (categories []string, grouped map[string][]OpenItem) {
 	grouped = make(map[string][]OpenItem)
 	for _, item := range items {
@@ -264,6 +350,7 @@ func groupCategoryItemsByGroup(group string, items []OpenItem) (categories []str
 	for _, cat := range categoryGroupOrder(group) {
 		if len(grouped[cat]) > 0 {
 			categories = append(categories, cat)
+			sortItemsByLeadingTag(grouped[cat])
 		}
 	}
 	return categories, grouped

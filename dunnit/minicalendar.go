@@ -92,52 +92,16 @@ func showMiniCalendarDialog(a fyne.App, parent fyne.Window) {
 		},
 	)
 
-	tagEntry := widget.NewEntry()
+	tagEntry := newTagAutoEntry()
 	tagEntry.SetPlaceHolder("#tag (e.g. #dsu, #boss)")
 
-	// Tag autocomplete, same approach as the main entry field (FR-10,
-	// see ui.go) -- suggests previously-used tags from ledger
-	// history as the user types "#...".
-	var tagPopup *widget.PopUpMenu
-	dismissTagPopup := func() {
-		if tagPopup != nil {
-			tagPopup.Hide()
-			tagPopup = nil
-		}
-	}
-	tagEntry.OnChanged = func(text string) {
-		dismissTagPopup()
-		start, fragment, ok := currentTagFragment(text, tagEntry.CursorColumn)
-		if !ok || len(fragment) < 2 {
-			return
-		}
-		matches := matchingTags(KnownTags(), fragment[1:])
-		if len(matches) == 0 {
-			return
-		}
-		items := make([]*fyne.MenuItem, len(matches))
-		for i, tag := range matches {
-			tag := tag
-			items[i] = fyne.NewMenuItem(tag, func() {
-				runes := []rune(text)
-				newText := string(runes[:start]) + tag + string(runes[tagEntry.CursorColumn:])
-				tagEntry.SetText(newText)
-				tagEntry.CursorColumn = start + len([]rune(tag))
-				tagEntry.Refresh()
-				dismissTagPopup()
-			})
-		}
-		canvas := fyne.CurrentApp().Driver().CanvasForObject(tagEntry)
-		if canvas == nil {
-			return
-		}
-		tagPopup = widget.NewPopUpMenu(fyne.NewMenu("", items...), canvas)
-		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(tagEntry)
-		tagPopup.ShowAtPosition(pos.Add(fyne.NewPos(0, tagEntry.Size().Height)))
-		fyne.Do(func() {
-			canvas.Focus(tagEntry)
-		})
-	}
+	// Tag autocomplete, same tagAutoEntry approach as the main entry
+	// field (FR-10, see ui.go/tagautoentry.go) -- suggests previously-
+	// used tags from ledger history as the user types "#...", as an
+	// inline sibling suggestion list (not a canvas overlay -- see
+	// tagautoentry.go's doc comment for why overlays broke keyboard
+	// input entirely).
+	tagSuggestions := tagEntry.SuggestionBox()
 
 	cadenceSelect := widget.NewSelect(meetingCadenceOptions, nil)
 	cadenceSelect.SetSelected("Weekly")
@@ -263,6 +227,7 @@ func showMiniCalendarDialog(a fyne.App, parent fyne.Window) {
 			widget.NewLabel("Recurring Meetings"),
 			widget.NewRichTextFromMarkdown("*Use these tags throughout your weeks any time a meeting topic thought comes to mind. They\u2019ll be collected and presented to you just before your meeting starts.*"),
 			tagEntry,
+			tagSuggestions,
 			container.NewHBox(cadenceSelect, dowSelect, timeWrapper, intervalLabel, intervalWrapper, weekLabel, weekendSelect, addBtn),
 		),
 		deleteBtn,
@@ -271,7 +236,7 @@ func showMiniCalendarDialog(a fyne.App, parent fyne.Window) {
 	)
 
 	w := a.NewWindow("Recurring Meetings")
-	w.SetContent(content)
+	w.SetContent(windowPad(content))
 	w.Resize(fyne.NewSize(560, 420))
 	w.Show()
 }
@@ -371,13 +336,11 @@ func lastOccurrence(m RecurringMeeting, now time.Time) time.Time {
 	return candidate
 }
 
-// dueForPostMeetingNudge reports whether m's most recent occurrence
-// ended between minAfter and maxAfter ago from now (FR-36 -- surfaced
-// shortly after a recurring meeting's scheduled time passes). Assumes
-// a nominal meeting length isn't tracked, so "ended" is approximated
-// as "started" -- good enough for a soft suggestion nudge.
-func dueForPostMeetingNudge(m RecurringMeeting, now time.Time, minAfter, maxAfter time.Duration) bool {
-	last := lastOccurrence(m, now)
-	elapsed := now.Sub(last)
-	return elapsed >= minAfter && elapsed <= maxAfter
-}
+// dueForPostMeetingNudge was FR-36's original post-meeting-window
+// check (fired 15-45 min after a meeting's start, since duration
+// isn't tracked). Removed 2026-09-03: Post-Meeting Capture now opens
+// alongside Meeting Prep at meeting *start* instead (sched.go), so
+// there's no separate after-the-fact window to check for. Left as a
+// comment (not deleted outright) in case a future "actually track
+// meeting end" feature wants this shape again -- if reintroduced,
+// this exact function signature is a good starting point.

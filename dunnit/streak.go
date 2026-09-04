@@ -13,10 +13,7 @@ import (
 // left behind by some code paths, e.g. directory creation without an
 // actual entry -- treat that as "nothing logged").
 func ledgerHasEntries(date time.Time) bool {
-	yr, wk := date.ISOWeek()
-	moname := date.Format("Jan")
-	fpath := ledgerDirFor(yr, wk, moname)
-	fname := fpath + "/ledger-" + date.Format("20060102") + ".txt"
+	_, fname := ledgerPathFor(date)
 	info, err := os.Stat(fname)
 	if err != nil {
 		return false

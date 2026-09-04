@@ -152,19 +152,24 @@ func showPeriodReviewWindow(a fyne.App, period summaryPeriod, anchor time.Time) 
 		}()
 	}
 
-	// Carry-forward: same never-lose-data guarantee as EOD (defaults
-	// checked). Applied on Done regardless of whether a report was
-	// ever generated -- generating/saving a report and carrying
-	// forward open items are independent actions.
+	// Postpone-opt-out: same eodOpenItemsSection as EOD (2026-09-02,
+	// see docs/todo-carryforward-design.md) -- unresolved TODOs/
+	// QUESTIONs now carry forward to the next day automatically
+	// (runCarryForwardIfNeeded), so this section's role is to let the
+	// user explicitly send an item to SOMEDAY (Postpone) instead,
+	// stopping it from continuing to carry forward. Applied on Done
+	// regardless of whether a report was ever generated -- generating/
+	// saving a report and postponing open items are independent
+	// actions.
 	todoBox, openTodos, todoChecks := eodOpenItemsSection("TODO")
 	questionBox, openQuestions, questionChecks := eodOpenItemsSection("QUESTION")
 	carryForwardBox := container.NewVBox()
 	if len(openTodos) > 0 {
-		carryForwardBox.Add(widget.NewLabelWithStyle("Carry Forward Open TODOs", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
+		carryForwardBox.Add(widget.NewLabelWithStyle("Postpone Open TODOs (checked = send to SOMEDAY)", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
 		carryForwardBox.Add(todoBox)
 	}
 	if len(openQuestions) > 0 {
-		carryForwardBox.Add(widget.NewLabelWithStyle("Carry Forward Open QUESTIONs", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
+		carryForwardBox.Add(widget.NewLabelWithStyle("Postpone Open QUESTIONs (checked = send to SOMEDAY)", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
 		carryForwardBox.Add(questionBox)
 	}
 
@@ -173,12 +178,12 @@ func showPeriodReviewWindow(a fyne.App, period summaryPeriod, anchor time.Time) 
 	doneBtn := widget.NewButton("Done", func() {
 		for i, item := range openTodos {
 			if todoChecks[i].Checked {
-				carryForwardItem("TODO", item.Text)
+				recordPostponed(item)
 			}
 		}
 		for i, item := range openQuestions {
 			if questionChecks[i].Checked {
-				carryForwardItem("QUESTION", item.Text)
+				recordPostponed(item)
 			}
 		}
 		if applyOKRs != nil {
@@ -199,7 +204,7 @@ func showPeriodReviewWindow(a fyne.App, period summaryPeriod, anchor time.Time) 
 	}
 	content.Add(doneBtn)
 
-	w.SetContent(container.NewVScroll(content))
+	w.SetContent(windowPad(container.NewVScroll(content)))
 	w.Resize(fyne.NewSize(520, 500))
 	w.Show()
 }

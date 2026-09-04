@@ -177,7 +177,7 @@ func showNavigatorWindow(a fyne.App) {
 		results,
 	)
 
-	w.SetContent(content)
+	w.SetContent(windowPad(content))
 	w.Resize(fyne.NewSize(720, 560))
 	w.Show()
 }
@@ -250,7 +250,7 @@ func showNavigatorAIAnswerWindow(a fyne.App, question, answer string) {
 		widget.NewLabel("Q: "+question), nil, nil, nil,
 		body,
 	)
-	w.SetContent(content)
+	w.SetContent(windowPad(content))
 	w.Resize(fyne.NewSize(560, 420))
 	w.Show()
 }
@@ -349,11 +349,11 @@ func showNavigatorHistogramWindow(a fyne.App, entries []LedgerEntry) {
 	body := widget.NewMultiLineEntry()
 	body.Wrapping = fyne.TextWrapOff
 	body.SetText(formatCategoryHistogram(entries))
-	w.SetContent(container.NewBorder(
+	w.SetContent(windowPad(container.NewBorder(
 		widget.NewLabel(pluralCount(len(entries), "entry", "entries")+" by category:"),
 		nil, nil, nil,
 		body,
-	))
+	)))
 	w.Resize(fyne.NewSize(480, 420))
 	w.Show()
 }

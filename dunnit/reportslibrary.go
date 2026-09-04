@@ -149,7 +149,7 @@ func showReportsLibraryWindow(a fyne.App) {
 		results,
 	)
 
-	w.SetContent(content)
+	w.SetContent(windowPad(content))
 	w.Resize(fyne.NewSize(720, 560))
 	w.Show()
 }

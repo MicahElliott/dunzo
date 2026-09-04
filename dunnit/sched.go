@@ -203,8 +203,21 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 	// (~15-45 min after a meeting's start, since duration isn't
 	// tracked) and suggests that instead, independently deduped via
 	// firedPostFor.
-	firedFor := map[string]time.Time{}     // "tag" -> occurrence time already nudged for (pre-meeting)
-	firedPostFor := map[string]time.Time{} // "tag" -> occurrence time already nudged for (post-meeting)
+	// FR-16: pre-meeting nudge, checking every 15 min (per Micah's
+	// call -- simplest fixed interval, not tied to NudgeIntervalMinutes)
+	// whether any FR-15 recurring meeting's next occurrence starts
+	// within the next ~15 min. firedFor dedupes so the same occurrence
+	// doesn't nudge repeatedly across multiple 15-min checks while
+	// still inside the window. A "#dsu" tag (FR-17) triggers the
+	// deterministic standup export instead of the generic Meeting
+	// Prep dialog; every other tag still gets Meeting Prep (FR-12),
+	// plus (2026-09-03, moved from a separate 15-45-min-*after*-start
+	// nudge, per feedback that filling it in *during* the meeting is
+	// more useful than trying to recall details afterward) FR-36's
+	// Post-Meeting Capture window, opened alongside Meeting Prep so
+	// both are available right as the meeting starts and can be
+	// filled in live.
+	firedFor := map[string]time.Time{} // "tag" -> occurrence time already nudged for
 	_, err = s.NewJob(
 		gocron.DurationJob(15*time.Minute),
 		gocron.NewTask(func() {
@@ -223,19 +236,8 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 								showStandupExport(a)
 							} else {
 								showMeetingPrepDialog(a)
+								showPostMeetingCapture(a, m.Tag)
 							}
-						})
-					}
-				}
-				if dueForPostMeetingNudge(m, now, 15*time.Minute, 45*time.Minute) {
-					occ := lastOccurrence(m, now)
-					if fired, ok := firedPostFor[m.Tag]; !ok || !fired.Equal(occ) {
-						firedPostFor[m.Tag] = occ
-						a.SendNotification(fyne.NewNotification(
-							"Dunzo", "Post-meeting capture for "+m.Tag+"?"))
-						m := m // capture for closure
-						fyne.Do(func() {
-							showPostMeetingCapture(a, m.Tag)
 						})
 					}
 				}

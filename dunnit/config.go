@@ -160,6 +160,29 @@ type Config struct {
 	// case-sensitive, same as tags are written/matched everywhere
 	// else in this codebase.
 	ReportExcludeTags []string `toml:"report_exclude_tags"`
+
+	// WastedTimeTrackingEnabled, when true, offers the WASTED
+	// category in Daybook's live picker (End/All group filters,
+	// Faves). Default false: WASTED is an opt-in "track time you feel
+	// was wasted" feature some users won't want surfaced at all. When
+	// false, WASTED is still present in Categories (so Help/legend
+	// text and historical ledger entries still resolve/display
+	// correctly) -- only excluded from picker option lists, same
+	// mechanical pattern EODOnly already uses for SUMMARY/
+	// PRODUCTIVITY/MEETING_HOURS (see CategoryLabelsForGroup/
+	// CategoryLabelsForFaves in categories.go).
+	WastedTimeTrackingEnabled bool `toml:"wasted_time_tracking_enabled"`
+
+	// LastCarryForwardDate is "YYYY-MM-DD", the last calendar date
+	// on which unresolved open items (TODO/GOAL/WAITING/QUESTION/
+	// FIXME/RISK) were copied forward into that day's ledger (see
+	// docs/todo-carryforward-design.md). Same pattern as
+	// RecurringMeeting's lastOccurrence tracking, just persisted here
+	// instead of derived from ledger content -- deliberately NOT
+	// inferred from "is today's ledger file empty", since a user who
+	// logs an entry before carry-forward has run would make that
+	// check wrong. Empty string means carry-forward has never run.
+	LastCarryForwardDate string `toml:"last_carry_forward_date"`
 }
 
 // defaultConfig mirrors the values from dunnit's config-example.zsh.
@@ -195,6 +218,8 @@ func defaultConfig() Config {
 
 		FavoriteCategories: []string{"DONE", "TODO", "IDEA", "FIXME", "MEETING"},
 		ReportExcludeTags:  []string{"#home", "#personal", "#buy", "#shop"},
+
+		WastedTimeTrackingEnabled: false,
 	}
 }
 

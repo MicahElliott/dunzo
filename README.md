@@ -11,6 +11,19 @@ which relied on macOS-only tools (`terminal-notifier`, `alerter`) that
 have since bit-rotted. Dunzo aims to be cross-platform (macOS + Linux)
 and much smaller in scope.
 
+## Guiding Principles
+
+- tiny (20MB desktop app)
+- text-based
+- mouseless, keyboard driven
+- similar to org-mode, but GUI and more intuitive and no Emacs required
+- similar in scope to Todo-tracker but totally different approach
+- ledger-based, text-only storage
+- data can be stored/synced either via 1-table sqlite db or via text files/git
+- optional AI-powered reporting
+- assistance/automation for all writing of meeting prep and minutes, status reports,
+  quarterly/annual reviews
+
 ## Status
 
 Early and rough. The core loop (record an entry, browse today's

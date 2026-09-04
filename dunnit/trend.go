@@ -144,11 +144,11 @@ func showTrendView(a fyne.App) {
 	refresh()
 
 	w := a.NewWindow("Dunzo: Productivity/Sentiment Trend")
-	w.SetContent(container.NewBorder(
+	w.SetContent(windowPad(container.NewBorder(
 		container.NewHBox(widget.NewLabel("Last N days:"), rangeSelect),
 		nil, nil, nil,
 		body,
-	))
+	)))
 	w.Resize(fyne.NewSize(480, 480))
 	w.Show()
 }

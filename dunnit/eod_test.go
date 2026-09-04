@@ -6,22 +6,6 @@ import (
 	"time"
 )
 
-func TestCarryForwardTodo(t *testing.T) {
-	withTempDunzoDir(t)
-
-	carryForwardItem("TODO", "finish the report")
-
-	_, fname := tomorrowLedgerPath()
-	data, err := os.ReadFile(fname)
-	if err != nil {
-		t.Fatalf("expected tomorrow's ledger to exist: %v", err)
-	}
-	want := "[05:00] TODO finish the report\n"
-	if got := string(data); got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
 func TestRecordTomorrowGoals(t *testing.T) {
 	withTempDunzoDir(t)
 

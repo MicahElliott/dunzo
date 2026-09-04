@@ -163,7 +163,16 @@ func concatLedgerFiles(files []string) string {
 
 // lineHasExcludedTag reports whether line contains any of
 // excludeTags (each an exact "#tag" token, matched the same way tags
-// are matched everywhere else -- see extractTags).
+// are matched everywhere else -- see extractTags -- except
+// case-insensitively). Case-insensitive matching was added 2026-09-03
+// after a real bug report: Settings' exclude-tags field and a ledger
+// line can easily end up with differently-cased versions of "the
+// same" tag (e.g. "#Home" logged vs "#home" configured) since nothing
+// else in the app normalizes tag casing, and every other tag-matching
+// path (autocomplete, KnownTags) is exact-match by design for display
+// purposes -- exclusion is different: a user configuring "#home" as
+// noise to filter out clearly means to catch "#Home" too, not silently
+// let it through.
 func lineHasExcludedTag(line string, excludeTags []string) bool {
 	if len(excludeTags) == 0 {
 		return false
@@ -174,10 +183,10 @@ func lineHasExcludedTag(line string, excludeTags []string) bool {
 	}
 	excluded := make(map[string]bool, len(excludeTags))
 	for _, t := range excludeTags {
-		excluded[t] = true
+		excluded[strings.ToLower(t)] = true
 	}
 	for _, t := range tags {
-		if excluded[t] {
+		if excluded[strings.ToLower(t)] {
 			return true
 		}
 	}
@@ -273,7 +282,7 @@ func showSummarizeDialog(a fyne.App) {
 		),
 	)
 
-	w.SetContent(content)
+	w.SetContent(windowPad(content))
 	w.Resize(fyne.NewSize(300, 140))
 	w.Show()
 }
@@ -282,15 +291,15 @@ func runSummarize(a fyne.App, period summaryPeriod) {
 	ledgerText := gatherLedgerText(period)
 	if strings.TrimSpace(ledgerText) == "" {
 		w := a.NewWindow("Dunzo: Summary")
-		w.SetContent(widget.NewLabel("No ledger entries found for that period."))
+		w.SetContent(windowPad(widget.NewLabel("No ledger entries found for that period.")))
 		w.Show()
 		return
 	}
 
 	progress := a.NewWindow("Dunzo: Summarizing\u2026")
-	progress.SetContent(widget.NewLabel(
+	progress.SetContent(windowPad(widget.NewLabel(
 		"Asking gh copilot to summarize, please wait\u2026\n" +
-			"The generated report will be copied to your clipboard automatically."))
+			"The generated report will be copied to your clipboard automatically.")))
 	progress.Show()
 
 	go func() {
@@ -299,13 +308,13 @@ func runSummarize(a fyne.App, period summaryPeriod) {
 			progress.Close()
 			w := a.NewWindow(fmt.Sprintf("Dunzo: %s Summary", period))
 			if err != nil {
-				w.SetContent(widget.NewLabel("Error running gh copilot:\n" + err.Error()))
+				w.SetContent(windowPad(widget.NewLabel("Error running gh copilot:\n" + err.Error())))
 			} else {
 				a.Clipboard().SetContent(summary)
 				body := widget.NewMultiLineEntry()
 				body.SetText(summary)
 				body.Wrapping = fyne.TextWrapWord
-				w.SetContent(container.NewVScroll(body))
+				w.SetContent(windowPad(container.NewVScroll(body)))
 			}
 			w.Resize(fyne.NewSize(600, 500))
 			w.Show()

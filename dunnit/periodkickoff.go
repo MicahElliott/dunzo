@@ -149,7 +149,7 @@ func showPeriodKickoffWindow(a fyne.App, period summaryPeriod, anchor time.Time)
 		for _, cat := range cats {
 			listBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
 			for _, item := range grouped[cat] {
-				listBox.Add(widget.NewLabel("\u2022 " + item.Text))
+				listBox.Add(widget.NewLabel("\u2022 " + stripCarryForwardSince(item.Text) + staleBadge(item.Text)))
 			}
 		}
 		listBox.Refresh()
@@ -203,7 +203,7 @@ func showPeriodKickoffWindow(a fyne.App, period summaryPeriod, anchor time.Time)
 	}
 	content.Add(widget.NewButton("Done", func() { w.Close() }))
 
-	w.SetContent(content)
+	w.SetContent(windowPad(content))
 	w.Resize(fyne.NewSize(560, 620))
 	w.Show()
 }

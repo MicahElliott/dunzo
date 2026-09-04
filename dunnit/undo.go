@@ -7,7 +7,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -72,43 +71,150 @@ func replaceLedgerLineTextAt(idx int, newText string) error {
 	return writeLedgerLines(lines)
 }
 
-// showEditItemDialog opens a small modal (dialog.NewCustomConfirm --
-// not a separate window) pre-filled with item.Text, letting the user
-// edit and save it back over the original ledger line (preserving
-// timestamp/category), or cancel. Calls onSave after a successful
-// save so callers can refresh dependent UI. Used by Daybook's inline
-// ✏️ Edit action, currently on Activity items -- generic enough to
-// reuse for Planned/Reflections too if wanted later.
+// replaceLedgerLineAt rewrites the line at idx to use newCategory and
+// newText, preserving its original timestamp, and trimming newText's
+// leading/trailing whitespace. No-op if idx is out of range or the
+// line isn't well-formed. Used by showEditItemDialog's Save action
+// (which lets the user change both category and text together, not
+// just text as replaceLedgerLineTextAt alone did).
+func replaceLedgerLineAt(idx int, newCategory, newText string) error {
+	lines := readLedgerLines()
+	if idx < 0 || idx >= len(lines) {
+		return nil
+	}
+	parts := strings.SplitN(lines[idx], " ", 3)
+	if len(parts) < 3 {
+		return nil
+	}
+	lines[idx] = parts[0] + " " + newCategory + " " + strings.TrimSpace(newText)
+	return writeLedgerLines(lines)
+}
+
+// deleteLedgerLineAt removes the line at idx entirely (unlike
+// removeLastLedgerLine, which only ever removes the literal last
+// line -- this targets an arbitrary line by index, same as
+// replaceLedgerLineTextAt/replaceLedgerLineCategoryAt). No-op if idx
+// is out of range. Used by showEditItemDialog's Delete action.
+func deleteLedgerLineAt(idx int) error {
+	lines := readLedgerLines()
+	if idx < 0 || idx >= len(lines) {
+		return nil
+	}
+	return writeLedgerLines(append(lines[:idx], lines[idx+1:]...))
+}
+
+// showEditItemDialog opens a small modal (dialog.NewCustomWithout
+// Buttons -- not a separate window) pre-filled with item.Text,
+// letting the user edit its text, change its category (via a
+// dropdown restricted to categories sharing the item's own Group --
+// see GroupForCode/CategoryOptionsForGroup -- shown with their emoji,
+// e.g. "✔️ DONE", and excluding EODOnly codes like ONGOING/SUMMARY/
+// PRODUCTIVITY/MEETING_HOURS, which are always machine-written and
+// never meant to be hand-picked), Save, Cancel, or Delete the entry
+// outright. Calls onSave after a successful save/delete so callers
+// can refresh dependent UI. Used by Daybook's inline ✏️ Edit action
+// across Planned/Endings/Hilites.
+//
+// Built on NewCustomWithoutButtons (rather than NewCustomConfirm,
+// which only ever creates a fixed Save/Cancel pair) so a third
+// Delete action can share the same button row. Esc-to-cancel and
+// Tab-to-Save: see dialogEntry's doc comment (dialogentry.go) for why
+// a plain widget.Entry can't do either of these correctly, and why
+// the fix lives on the Entry itself rather than as a window/canvas-
+// level shortcut. Any other custom dialog added to this codebase
+// later should use dialogEntry the same way, rather than
+// reintroducing the same two bugs.
 func showEditItemDialog(parent fyne.Window, item OpenItem, onSave func()) {
-	entry := widget.NewEntry()
-	entry.SetText(item.Text)
-	d := dialog.NewCustomConfirm("Edit Entry", "Save", "Cancel", entry, func(save bool) {
-		if !save {
-			return
+	group := GroupForCode(item.Category)
+	catOptions := CategoryOptionsForGroup(group)
+	itemLabel := item.Category
+	for _, c := range Categories {
+		if c.Code == item.Category {
+			itemLabel = c.Label()
+			break
 		}
-		if err := replaceLedgerLineTextAt(item.LineIndex, entry.Text); err != nil {
+	}
+	if len(catOptions) == 0 {
+		catOptions = []string{itemLabel} // fallback: shouldn't happen for a real item
+	}
+	catSelect := widget.NewSelect(catOptions, nil)
+	catSelect.SetSelected(itemLabel)
+
+	var d *dialog.CustomDialog
+	var saveBtn *widget.Button
+
+	entry := newDialogEntry(
+		nil, // Esc wired below, once d exists
+		nil, // Tab-forward wired below, once saveBtn exists
+	)
+	entry.SetText(item.Text)
+	// SetMinRowsVisible(2) keeps the box from defaulting to a much
+	// taller multi-line entry -- 2 rows is enough for wrapping a
+	// typical entry without wasting vertical space on an empty dialog
+	// most of the time (dialogEntry is MultiLine so Wrapping can take
+	// effect at all, see its doc comment, but that doesn't mean it
+	// needs to look tall).
+	entry.SetMinRowsVisible(2)
+
+	doSave := func() {
+		newCat := item.Category
+		if sel := catSelect.Selected; sel != "" {
+			if parts := strings.Split(sel, " "); len(parts) == 2 {
+				newCat = parts[1]
+			}
+		}
+		if err := replaceLedgerLineAt(item.LineIndex, newCat, entry.Text); err != nil {
 			dialog.ShowError(err, parent)
 			return
 		}
+		d.Hide()
 		onSave()
-	}, parent)
-	// Enter submits (same as clicking Save) -- Confirm() runs the
-	// callback above with save=true, same as the Save button.
-	entry.OnSubmitted = func(string) { d.Confirm() }
-	// Esc dismisses (same as clicking Cancel) -- Fyne's CustomConfirm
-	// doesn't wire this by default. Registered on the parent window's
-	// canvas (standard Fyne shortcut pattern) rather than the entry
-	// itself, since Escape isn't a key Entry's own TypedKey handling
-	// reacts to. Fyne doesn't provide a per-dialog "closed" removal
-	// hook for canvas shortcuts, but that's harmless here: the
-	// shortcut just calls Dismiss() on an already-hidden dialog if
-	// triggered again later, a no-op.
-	parent.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyEscape},
-		func(fyne.Shortcut) { d.Dismiss() })
-	// Fyne's default dialog width is quite narrow for a full ledger
-	// line of text -- widen it so longer entries aren't cramped/
-	// wrapped awkwardly while editing.
-	d.Resize(fyne.NewSize(520, 160))
+	}
+
+	d = dialog.NewCustomWithoutButtons("Edit Entry",
+		container.NewBorder(nil, nil, catSelect, nil, entry), parent)
+
+	entry.onEscape = func() { d.Hide() }
+	entry.OnSubmitted = func(string) { doSave() } // Enter submits, same as Save
+
+	saveBtn = widget.NewButton("Save", doSave)
+	saveBtn.Importance = widget.HighImportance
+	cancelBtn := widget.NewButton("Cancel", func() { d.Hide() })
+	// Delete removes the entry outright, distinct from Save/Cancel.
+	// Confirms nothing further here (no "are you sure?") -- the
+	// ledger's append-only design means the raw line is still
+	// recoverable by hand from the file if this is ever a mistake,
+	// same tradeoff already accepted by Discard/Postpone elsewhere.
+	deleteBtn := widget.NewButton("Delete", func() {
+		if err := deleteLedgerLineAt(item.LineIndex); err != nil {
+			dialog.ShowError(err, parent)
+			return
+		}
+		d.Hide()
+		showToast(parent.Canvas(), "Deleted")
+		onSave()
+	})
+	deleteBtn.Importance = widget.DangerImportance
+	d.SetButtons([]fyne.CanvasObject{cancelBtn, deleteBtn, saveBtn})
+
+	// Tab from the entry jumps straight to Save (not Cancel, which
+	// Fyne's default Objects-slice-order Tab traversal would land on
+	// first -- see dialogEntry's doc comment).
+	entry.onTabForward = func() {
+		if c := fyne.CurrentApp().Driver().CanvasForObject(entry); c != nil {
+			c.Focus(saveBtn)
+		}
+	}
+
+	// Widened ~20% over the prior fixed dialog width (520 -> 624) to
+	// fit the extra category dropdown alongside the entry without
+	// feeling cramped. Entry itself wraps (dialogEntry's Wrapping)
+	// rather than requiring one long unwrapped line -- no literal
+	// newlines allowed regardless (see dialogEntry's Return handling).
+	// Height trimmed from the original 180 -> 140 now that
+	// SetMinRowsVisible(2) keeps the entry itself from defaulting to
+	// a much taller box.
+	d.Resize(fyne.NewSize(624, 140))
 	d.Show()
 }
 
@@ -170,10 +276,10 @@ func showUndoEditLastEntry(a fyne.App, onChange func()) {
 		w.Close()
 	})
 
-	w.SetContent(container.NewBorder(
+	w.SetContent(windowPad(container.NewBorder(
 		widget.NewLabel("Last ledger line:"), nil, nil, nil,
 		container.NewBorder(nil, container.NewHBox(undoBtn, saveBtn), nil, nil, entry),
-	))
+	)))
 	w.Resize(fyne.NewSize(420, 200))
 	w.Show()
 }

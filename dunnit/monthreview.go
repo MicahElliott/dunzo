@@ -197,7 +197,7 @@ func showMonthReviewWindow(a fyne.App, anchor time.Time) {
 		doneBtn,
 	)
 
-	w.SetContent(container.NewVScroll(content))
+	w.SetContent(windowPad(container.NewVScroll(content)))
 	w.Resize(fyne.NewSize(520, 600))
 	w.Show()
 }

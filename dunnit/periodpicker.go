@@ -51,10 +51,10 @@ func showPeriodPicker(a fyne.App, cfg Config, period summaryPeriod, onChosen fun
 		addOption(offset)
 	}
 
-	w.SetContent(container.NewVBox(
+	w.SetContent(windowPad(container.NewVBox(
 		widget.NewLabel("Which "+string(period)+" would you like to work with?"),
 		list,
-	))
+	)))
 	w.Resize(fyne.NewSize(360, 320))
 	w.Show()
 }

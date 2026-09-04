@@ -55,6 +55,9 @@ func showSettings(a fyne.App) {
 	enableOKRs := widget.NewCheck("", nil)
 	enableOKRs.SetChecked(cfg.EnableOKRs)
 
+	wastedTimeTracking := widget.NewCheck("", nil)
+	wastedTimeTracking.SetChecked(cfg.WastedTimeTrackingEnabled)
+
 	// Faves bucket (categories.go/CategoryLabelsForFaves): multi-
 	// select of category codes, in Categories' declared order.
 	// widget.NewCheckGroup wants a []string of labels to check off,
@@ -93,6 +96,7 @@ func showSettings(a fyne.App) {
 		widget.NewFormItem("Skip US Federal Holidays", skipHolidays),
 		widget.NewFormItem("Extend Work Week to 7 Days", extendWorkWeek),
 		widget.NewFormItem("Enable OKRs (Quarter/Year Kickoff+Review)", enableOKRs),
+		widget.NewFormItem("Track Wasted Time (WASTED category)", wastedTimeTracking),
 		widget.NewFormItem("Report Exclude Tags", excludeTagsEntry),
 	)
 
@@ -153,6 +157,7 @@ func showSettings(a fyne.App) {
 		newCfg.SkipUSFederalHolidays = skipHolidays.Checked
 		newCfg.ExtendWorkWeekTo7Days = extendWorkWeek.Checked
 		newCfg.EnableOKRs = enableOKRs.Checked
+		newCfg.WastedTimeTrackingEnabled = wastedTimeTracking.Checked
 		newCfg.FavoriteCategories = append([]string{}, favesGroup.Selected...)
 		var excludeTags []string
 		for _, part := range strings.FieldsFunc(excludeTagsEntry.Text, func(r rune) bool { return r == ',' || r == ' ' }) {
@@ -189,12 +194,12 @@ func showSettings(a fyne.App) {
 		showRecurringItemsDialog(a, w)
 	})
 
-	w.SetContent(container.NewVScroll(container.NewVBox(form,
+	w.SetContent(windowPad(container.NewVScroll(container.NewVBox(form,
 		widget.NewLabelWithStyle("Kickoff / Review", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		periodForm,
 		widget.NewLabelWithStyle("Faves (Daybook picker's default bucket)", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		favesGroup,
-		recurringMeetingsBtn, recurringItemsBtn)))
+		recurringMeetingsBtn, recurringItemsBtn))))
 	w.Resize(fyne.NewSize(420, 620))
 	w.Show()
 }

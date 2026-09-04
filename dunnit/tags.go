@@ -311,7 +311,7 @@ func showAllTagsWindow(a fyne.App) {
 		list.Add(widget.NewLabel(formatTagWithCount(tag, stats[tag])))
 	}
 
-	w.SetContent(container.NewVScroll(list))
+	w.SetContent(windowPad(container.NewVScroll(list)))
 	w.Resize(fyne.NewSize(300, 500))
 	w.Show()
 }

@@ -74,7 +74,7 @@ func showStatusReportDialog(a fyne.App) {
 		),
 	)
 
-	w.SetContent(content)
+	w.SetContent(windowPad(content))
 	w.Resize(fyne.NewSize(360, 320))
 	w.Show()
 }
@@ -101,15 +101,15 @@ func runStatusReport(a fyne.App, from, to time.Time, audience string) {
 	ledgerText := gatherLedgerTextForRange(from, to, categories)
 	if ledgerText == "" {
 		w := a.NewWindow("Dunzo: Status Report")
-		w.SetContent(widget.NewLabel("No matching ledger entries found for that range."))
+		w.SetContent(windowPad(widget.NewLabel("No matching ledger entries found for that range.")))
 		w.Show()
 		return
 	}
 
 	progress := a.NewWindow("Dunzo: Generating Status Report\u2026")
-	progress.SetContent(widget.NewLabel(
+	progress.SetContent(windowPad(widget.NewLabel(
 		"Asking gh copilot to summarize, please wait\u2026\n" +
-			"The generated report will be copied to your clipboard automatically."))
+			"The generated report will be copied to your clipboard automatically.")))
 	progress.Show()
 
 	go func() {
@@ -118,13 +118,13 @@ func runStatusReport(a fyne.App, from, to time.Time, audience string) {
 			progress.Close()
 			w := a.NewWindow("Dunzo: " + audience + " Status Report")
 			if err != nil {
-				w.SetContent(widget.NewLabel("Error running gh copilot:\n" + err.Error()))
+				w.SetContent(windowPad(widget.NewLabel("Error running gh copilot:\n" + err.Error())))
 			} else {
 				a.Clipboard().SetContent(summary)
 				body := widget.NewMultiLineEntry()
 				body.SetText(summary)
 				body.Wrapping = fyne.TextWrapWord
-				w.SetContent(container.NewVScroll(body))
+				w.SetContent(windowPad(container.NewVScroll(body)))
 			}
 			w.Resize(fyne.NewSize(600, 500))
 			w.Show()

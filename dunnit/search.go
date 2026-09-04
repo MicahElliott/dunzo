@@ -80,7 +80,7 @@ func showSearchDialog(a fyne.App) {
 		results,
 	)
 
-	w.SetContent(content)
+	w.SetContent(windowPad(content))
 	w.Resize(fyne.NewSize(560, 480))
 	w.Show()
 }

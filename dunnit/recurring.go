@@ -302,7 +302,7 @@ func showRecurringItemsDialog(a fyne.App, parent fyne.Window) {
 	)
 
 	w := a.NewWindow("Recurring Items")
-	w.SetContent(content)
+	w.SetContent(windowPad(content))
 	w.Resize(fyne.NewSize(480, 420))
 	w.Show()
 }

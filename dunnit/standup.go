@@ -9,15 +9,41 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
 // standupCategories are the categories pulled into the deterministic
-// standup export (FR-17) -- what you actually got done, plus
-// call-out wins. Deliberately narrower than Summarize's full-ledger
-// LLM pass; this is meant to be instant and no-network.
-var standupCategories = map[string]bool{"DONE": true, "WIN": true}
+// standup export (FR-17) -- everything from the "End" and "Hilite"
+// groups (day-to-day capture/endpoints, plus freestanding notable-
+// event markers -- see docs/category-taxonomy.md), except:
+//   - ONGOING: purely Ditto's internal rewrite marker, never a real
+//     "what I did" item.
+//   - EODOnly categories (SUMMARY/PRODUCTIVITY/MEETING_HOURS): day-
+//     level wrap-up meta-notes, not standup-worthy activity of their
+//     own.
+//
+// Built dynamically from Categories (via categoryGroupOrder) rather
+// than a hardcoded list, so a future category addition to either
+// group is picked up here automatically without a second edit.
+// Originally just {"DONE", "WIN"} -- widened 2026-09-03 per feedback
+// that a standup's "yesterday" should reflect the fuller picture
+// (learnings, setbacks, notable events), not just completions/wins.
+var standupCategories = buildStandupCategories()
+
+func buildStandupCategories() map[string]bool {
+	out := map[string]bool{}
+	for _, group := range []string{"end", "hilite"} {
+		for _, code := range categoryGroupOrder(group) {
+			out[code] = true
+		}
+	}
+	for _, c := range Categories {
+		if c.EODOnly || c.Code == "ONGOING" {
+			delete(out, c.Code)
+		}
+	}
+	return out
+}
 
 // standupTag is the tag whose recurring meeting entry (if configured)
 // drives the "since" boundary for gatherStandupLines -- see
@@ -97,8 +123,8 @@ func parseLedgerLineTime(line string, date time.Time) (t time.Time, ok bool) {
 // gatherStandupLines reads ledger files covering standupSourceDates
 // (plus today's, so a window that started yesterday but runs through
 // "now" still picks up this morning's entries) and returns the
-// DONE/WIN lines' text (category prefix stripped) that fall at or
-// after since, oldest-first, deduplicated (exact-text repeats
+// standupCategories lines' text (category prefix stripped) that fall
+// at or after since, oldest-first, deduplicated (exact-text repeats
 // collapsed to one bullet, first occurrence kept).
 func gatherStandupLines(cfg Config, now time.Time) []string {
 	since := standupWindowStart(cfg, now)
@@ -138,7 +164,7 @@ func gatherStandupLines(cfg Config, now time.Time) []string {
 // placeholder message if there's nothing to report.
 func formatStandup(lines []string) string {
 	if len(lines) == 0 {
-		return "(no DONE/WIN entries found for the covered period)"
+		return "(no standup-worthy entries found for the covered period)"
 	}
 	var sb strings.Builder
 	for _, l := range lines {
@@ -152,11 +178,49 @@ func formatStandup(lines []string) string {
 // summarizeStandupWithCopilot runs the given (already-filtered,
 // hidden items excluded) lines through the same summarizeWithCopilot
 // pipeline used elsewhere, framed for a standup specifically.
+//
+// Prompt reframed 2026-09-03 to explicit classic-scrum structure
+// (What did you do yesterday / What will you do today / Risks &
+// blockers) rather than a generic "well-organized update" -- per
+// feedback that the prior framing didn't read as a real standup.
+// "What will you do today" has no dedicated data source of its own
+// (gatherStandupLines only ever pulls standupCategories -- "End" and
+// "Hilite" group entries, i.e. backward-looking items) -- today's still-open TODOs/GOALs (getOpenItems) are passed
+// alongside as explicit "currently open" context so the model has
+// real material for that section instead of inventing generic filler.
+// Also explicitly instructs the model to surface a "what do you need
+// help with" callout and favor concrete results over a busy-sounding
+// activity log.
 func summarizeStandupWithCopilot(lines []string) (string, error) {
+	var openBuf strings.Builder
+	for _, item := range getOpenItems() {
+		if item.Category != "TODO" && item.Category != "GOAL" {
+			continue
+		}
+		openBuf.WriteString("- " + stripCarryForwardSince(item.Text) + "\n")
+	}
+	openSection := "(nothing currently open)"
+	if openBuf.Len() > 0 {
+		openSection = openBuf.String()
+	}
+
+	input := "Completed/notable items:\n" + strings.Join(lines, "\n") +
+		"\n\nCurrently open TODOs/GOALs (candidates for \"today\"):\n" + openSection
+
 	return summarizeWithCopilotPrompt(
-		"Summarize these standup items into a brief, well-organized "+
-			"daily standup update (what was done, call out anything "+
-			"notable). Be concise.", strings.Join(lines, "\n"))
+		"Turn this into a classic scrum daily standup update, structured "+
+			"under exactly these three headings: "+
+			"\"What did I do yesterday\", \"What will I do today\", and "+
+			"\"Risks / blockers\". Base \"yesterday\" on the completed/"+
+			"notable items given; base \"today\" on the currently-open "+
+			"TODOs/GOALs given (pick the most relevant ones, don't just "+
+			"dump the whole list verbatim). If there's nothing worth "+
+			"flagging as a risk or blocker, say so briefly rather than "+
+			"omitting the heading. Explicitly call out anything the "+
+			"person might need help with, as its own short line under "+
+			"Risks/blockers if applicable. Focus on concrete results "+
+			"and outcomes rather than a busy-sounding activity log. Be "+
+			"concise -- bullet points, not prose.", input)
 }
 
 // showGeneratedStandupSummary displays an AI-generated standup
@@ -170,19 +234,22 @@ func showGeneratedStandupSummary(a fyne.App, parent fyne.Window, summary string)
 // showStandupExport builds the deterministic standup summary (FR-17
 // -- no LLM/network call, pure local ledger parsing) covering
 // everything since the last #dsu meeting (or the weekday-aware
-// yesterday fallback), copies it to the clipboard, and shows it in a
-// window with a per-item Hide (visibility-off icon) action -- Hide
-// only removes an item from this temporary view, it never writes
-// anything to the ledger -- and a bottom "Generate Summary" button
-// that runs the still-visible (non-hidden) items through
-// summarizeStandupWithCopilot and shows the result via
+// yesterday fallback), copies it to the clipboard, and shows it in an
+// **editable** text area (2026-09-03, replacing the old per-line
+// Hide-icon list) seeded with one gathered item per line, plus a
+// bottom "Generate Summary" button that runs whatever's currently in
+// that box (after the user's own edits, additions, or deletions)
+// through summarizeStandupWithCopilot and shows the result via
 // showGeneratedStandupSummary.
 //
-// Reordering/drag-to-sort was considered but isn't implemented: Fyne
-// has no built-in draggable-list-reorder widget, and building one
-// from scratch (custom drag gesture handling + list reflow) was
-// judged not worth the effort for this feature -- items stay in
-// chronological order.
+// Editing here only changes what's fed into *this generation's*
+// prompt input -- it never writes anything back to the ledger itself
+// (an instructional note above the box says so explicitly). This
+// replaces the old Hide-only affordance with something strictly more
+// capable (hide was really just "remove a line from what gets sent,"
+// which free-text editing already covers, plus now supports adding
+// a line the deterministic gather step didn't pick up, or fixing/
+// clarifying wording before it goes to the LLM).
 func showStandupExport(a fyne.App) {
 	now := time.Now()
 	cfg := LoadConfig()
@@ -192,42 +259,24 @@ func showStandupExport(a fyne.App) {
 
 	w := a.NewWindow("Dunzo: Standup Summary")
 
-	itemsBox := container.NewVBox()
-	hidden := make([]bool, len(lines))
-	var rebuildItemsBox func()
-	rebuildItemsBox = func() {
-		itemsBox.RemoveAll()
-		anyVisible := false
-		for i, line := range lines {
-			if hidden[i] {
-				continue
-			}
-			anyVisible = true
-			i := i // capture
-			row := container.NewBorder(nil, nil, nil,
-				newHoverIconButton(theme.Icon(theme.IconNameVisibilityOff), "Hide", func() {
-					hidden[i] = true
-					rebuildItemsBox()
-				}),
-				widget.NewLabel("\u2022 "+line))
-			itemsBox.Add(row)
-		}
-		if !anyVisible {
-			itemsBox.Add(widget.NewLabel("(nothing to show \u2014 either no DONE/WIN entries in the covered period, or everything\u2019s hidden)"))
-		}
-		itemsBox.Refresh()
+	itemsEntry := widget.NewMultiLineEntry()
+	itemsEntry.SetMinRowsVisible(10)
+	if len(lines) == 0 {
+		itemsEntry.SetPlaceHolder("(no standup-worthy entries found for the covered period -- type your own below if you like)")
+	} else {
+		itemsEntry.SetText(strings.Join(lines, "\n"))
 	}
-	rebuildItemsBox()
 
 	generateBtn := widget.NewButton("Generate Summary", func() {
 		var visible []string
-		for i, line := range lines {
-			if !hidden[i] {
+		for _, line := range strings.Split(itemsEntry.Text, "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
 				visible = append(visible, line)
 			}
 		}
 		if len(visible) == 0 {
-			dialog.ShowInformation("Nothing to Summarize", "All items are hidden (or there were none to begin with).", w)
+			dialog.ShowInformation("Nothing to Summarize", "The items box is empty.", w)
 			return
 		}
 		progress := dialog.NewCustomWithoutButtons("Generating Summary", widget.NewLabel("Running gh copilot, please wait\u2026"), w)
@@ -247,13 +296,20 @@ func showStandupExport(a fyne.App) {
 	})
 
 	content := container.NewBorder(
-		widget.NewLabel(fmt.Sprintf("Standup items since %s:", standupWindowStart(cfg, now).Format("Mon 15:04"))),
+		container.NewVBox(
+			widget.NewLabel(fmt.Sprintf("Standup items since %s:", standupWindowStart(cfg, now).Format("Mon 15:04"))),
+			widget.NewLabelWithStyle(
+				"Edit freely before generating -- add, remove, or reword lines "+
+					"(one item per line). This only changes what's sent to the "+
+					"summary prompt; it never edits the ledger itself.",
+				fyne.TextAlignLeading, fyne.TextStyle{Italic: true}),
+		),
 		generateBtn,
 		nil, nil,
-		container.NewVScroll(itemsBox),
+		itemsEntry,
 	)
 
-	w.SetContent(content)
+	w.SetContent(windowPad(content))
 	w.Resize(fyne.NewSize(480, 440))
 	w.Show()
 }

@@ -16,6 +16,7 @@ import (
 // showEODWindow's one-window-with-everything approach rather than a
 // chain of separate popups.
 func showSODWindow(a fyne.App) {
+	runCarryForwardIfNeeded()
 	w := a.NewWindow("Dunzo: Start of Day")
 
 	listBox := container.NewVBox()
@@ -36,7 +37,7 @@ func showSODWindow(a fyne.App) {
 		for _, cat := range cats {
 			listBox.Add(widget.NewLabelWithStyle(categoryPlural(cat), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
 			for _, item := range grouped[cat] {
-				listBox.Add(widget.NewLabel("\u2022 " + item.Text))
+				listBox.Add(widget.NewLabel("\u2022 " + stripCarryForwardSince(item.Text) + staleBadge(item.Text)))
 			}
 		}
 		listBox.Refresh()
@@ -49,7 +50,7 @@ func showSODWindow(a fyne.App) {
 				}
 				b.WriteString(categoryPlural(cat) + "\n")
 				for _, item := range grouped[cat] {
-					b.WriteString("- " + item.Text + "\n")
+					b.WriteString("- " + stripCarryForwardSince(item.Text) + "\n")
 				}
 			}
 			return b.String()
@@ -87,51 +88,15 @@ func showSODWindow(a fyne.App) {
 
 	newItemCat := widget.NewSelect(openTrackedCategories, nil)
 	newItemCat.SetSelected("TODO")
-	newItemText := widget.NewEntry()
+	newItemText := newTagAutoEntry()
 	newItemText.SetPlaceHolder("Add a new open item for today\u2026")
 
-	// Tag autocomplete (FR-10), same pattern as the main Daybook entry
-	// (ui.go) and Recurring Meetings' tag field (minicalendar.go).
-	var tagPopup *widget.PopUpMenu
-	dismissTagPopup := func() {
-		if tagPopup != nil {
-			tagPopup.Hide()
-			tagPopup = nil
-		}
-	}
-	newItemText.OnChanged = func(text string) {
-		dismissTagPopup()
-		start, fragment, ok := currentTagFragment(text, newItemText.CursorColumn)
-		if !ok || len(fragment) < 2 {
-			return
-		}
-		matches := matchingTags(KnownTags(), fragment[1:])
-		if len(matches) == 0 {
-			return
-		}
-		items := make([]*fyne.MenuItem, len(matches))
-		for i, tag := range matches {
-			tag := tag
-			items[i] = fyne.NewMenuItem(tag, func() {
-				runes := []rune(text)
-				newText := string(runes[:start]) + tag + string(runes[newItemText.CursorColumn:])
-				newItemText.SetText(newText)
-				newItemText.CursorColumn = start + len([]rune(tag))
-				newItemText.Refresh()
-				dismissTagPopup()
-			})
-		}
-		canvas := fyne.CurrentApp().Driver().CanvasForObject(newItemText)
-		if canvas == nil {
-			return
-		}
-		tagPopup = widget.NewPopUpMenu(fyne.NewMenu("", items...), canvas)
-		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(newItemText)
-		tagPopup.ShowAtPosition(pos.Add(fyne.NewPos(0, newItemText.Size().Height)))
-		fyne.Do(func() {
-			canvas.Focus(newItemText)
-		})
-	}
+	// Tag autocomplete (FR-10), same tagAutoEntry pattern as the main
+	// Daybook entry (ui.go) and Recurring Meetings' tag field
+	// (minicalendar.go) -- see tagautoentry.go's doc comment for why
+	// this is an inline suggestion list, not a canvas overlay
+	// (PopUpMenu/PopUp were both tried and both broke keyboard input).
+	newItemSuggestions := newItemText.SuggestionBox()
 
 	addItem := func() {
 		text := strings.TrimSpace(newItemText.Text)
@@ -169,11 +134,12 @@ func showSODWindow(a fyne.App) {
 		copyBtn,
 		recurringBox,
 		entryRow,
+		newItemSuggestions,
 		syncNote,
 		widget.NewButton("Done", func() { w.Close() }),
 	)
 
-	w.SetContent(content)
+	w.SetContent(windowPad(content))
 	w.Resize(fyne.NewSize(560, 480))
 	w.Show()
 }

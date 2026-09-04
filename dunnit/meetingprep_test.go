@@ -2,7 +2,6 @@ package dun
 
 import (
 	"os"
-	"strconv"
 	"testing"
 	"time"
 )
@@ -40,13 +39,10 @@ func TestLastN(t *testing.T) {
 // the given raw lines (test helper, mirrors DunzoDir's naming scheme).
 func writeLedgerFileForDate(t *testing.T, date time.Time, lines []string) {
 	t.Helper()
-	yr, wk := date.ISOWeek()
-	moname := date.Format("Jan")
-	dir := DunzoDir() + "/" + strconv.Itoa(yr) + "/w" + strconv.Itoa(wk) + "-" + moname
+	dir, fname := ledgerPathFor(date)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	fname := dir + "/ledger-" + date.Format("20060102") + ".txt"
 	f, err := os.Create(fname)
 	if err != nil {
 		t.Fatal(err)

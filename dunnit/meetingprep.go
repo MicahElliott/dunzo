@@ -205,7 +205,7 @@ func showMeetingPrepDialog(a fyne.App) {
 		),
 	)
 
-	w.SetContent(content)
+	w.SetContent(windowPad(content))
 	w.Resize(fyne.NewSize(480, 520))
 	w.Show()
 }
