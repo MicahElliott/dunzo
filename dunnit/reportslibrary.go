@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"sort"
@@ -46,7 +46,7 @@ func reportKindLabel(kind string) string {
 // See docs/navigator-design.md for the design discussion this closes
 // out ("Saved-reports library/browser" and "Cross-report search").
 func showReportsLibraryWindow(a fyne.App) {
-	w := a.NewWindow("Dunzo: Reports Library")
+	w := a.NewWindow("Dunnit: Reports Library")
 
 	all := AllReportFiles()
 	kindOptions := []string{"All"}
@@ -139,7 +139,7 @@ func showReportsLibraryWindow(a fyne.App) {
 		if err != nil {
 			body = "(error reading report: " + err.Error() + ")"
 		}
-		showGeneratedReport(a, "Dunzo: "+reportKindLabel(r.Kind), r.Path, body)
+		showGeneratedReport(a, "Dunnit: "+reportKindLabel(r.Kind), r.Path, body)
 	})
 
 	content := container.NewVBox(

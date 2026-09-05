@@ -182,7 +182,7 @@ ledgers) -- **reportindex.go**/**reportsearch.go**/**reportslibrary.go**:
 - `ReportFile` (reportindex.go): lightweight per-report-file metadata
   (Path, Kind, Theme, Date=file mtime) -- deliberately much lighter
   than `LedgerEntry`, since reports are large markdown documents, not
-  per-line structured data. `AllReportFiles()` walks `DunzoDir()`'s
+  per-line structured data. `AllReportFiles()` walks `DunnitDir()`'s
   root (`review-*`/`dsu-*`/`som-*`) plus every ledger-adjacent
   `summary-*.md` daily-summary doc (`dailysummary.go`'s per-day-
   directory convention), parsing kind/theme out of each filename via

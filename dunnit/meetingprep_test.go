@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"os"
@@ -36,7 +36,7 @@ func TestLastN(t *testing.T) {
 }
 
 // writeLedgerFileForDate creates a ledger file for the given date with
-// the given raw lines (test helper, mirrors DunzoDir's naming scheme).
+// the given raw lines (test helper, mirrors DunnitDir's naming scheme).
 func writeLedgerFileForDate(t *testing.T, date time.Time, lines []string) {
 	t.Helper()
 	dir, fname := ledgerPathFor(date)
@@ -54,7 +54,7 @@ func writeLedgerFileForDate(t *testing.T, date time.Time, lines []string) {
 }
 
 func TestPullTaggedEntries(t *testing.T) {
-	withTempDunzoDir(t)
+	withTempDunnitDir(t)
 
 	today := time.Now()
 	oldDate := today.AddDate(0, 0, -30) // outside a 2-week lookback
@@ -81,7 +81,7 @@ func TestPullTaggedEntries(t *testing.T) {
 }
 
 func TestPullTaggedEntries_CategoryFilter(t *testing.T) {
-	withTempDunzoDir(t)
+	withTempDunnitDir(t)
 
 	today := time.Now()
 	writeLedgerFileForDate(t, today, []string{

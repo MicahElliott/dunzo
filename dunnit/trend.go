@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"strconv"
@@ -143,7 +143,7 @@ func showTrendView(a fyne.App) {
 	rangeSelect.OnChanged = func(string) { refresh() }
 	refresh()
 
-	w := a.NewWindow("Dunzo: Productivity/Sentiment Trend")
+	w := a.NewWindow("Dunnit: Productivity/Sentiment Trend")
 	w.SetContent(windowPad(container.NewBorder(
 		container.NewHBox(widget.NewLabel("Last N days:"), rangeSelect),
 		nil, nil, nil,

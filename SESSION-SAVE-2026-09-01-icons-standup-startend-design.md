@@ -1,4 +1,4 @@
-# Dunzo Session Save -- 2026-09-01 -- icons/UI polish, standup rework, Start/End design question
+# Dunnit Session Save -- 2026-09-01 -- icons/UI polish, standup rework, Start/End design question
 
 Status: everything below **except the final open design discussion**
 is done, committed, and pushed to `origin/main`. The Start/End-of-
@@ -63,7 +63,7 @@ together and "feeling overwhelming" per Micah. Now:
   own prompt, explicitly titled e.g. "Aug 2026 Summary" (via
   `from.Format("Jan 2006")`).
 - Added Copy (clipboard) + Save (writes to
-  `DunzoDir()/som-YYYYMM.md`) buttons under the digest, mirroring the
+  `DunnitDir()/som-YYYYMM.md`) buttons under the digest, mirroring the
   pattern from Standup Summary's generated-output window
   (`showGeneratedStandupSummary` in `standup.go`). **Note**: this is
   the third slightly-different Copy/Save/report-window
@@ -83,7 +83,7 @@ together and "feeling overwhelming" per Micah. Now:
   (non-hidden) items through a standup-framed
   `summarizeStandupWithCopilot` prompt, shows result via
   `showGeneratedStandupSummary` with Copy/Save (saves to
-  `DunzoDir()/dsu-YYYYMMDD.md`).
+  `DunnitDir()/dsu-YYYYMMDD.md`).
 - Time window fixed to span across midnight: previously only pulled
   "yesterday's" ledger (or Fri+Sat+Sun on Monday), missing anything
   logged *this morning before the actual standup meeting*. Now

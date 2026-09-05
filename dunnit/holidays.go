@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import "time"
 
@@ -11,7 +11,7 @@ import "time"
 //
 // Deliberately does NOT observe the "if it falls on a weekend, shift
 // to the nearest weekday" rule some federal-employee calendars use --
-// gating Dunzo's nudges off already treats every Saturday/Sunday as
+// gating Dunnit's nudges off already treats every Saturday/Sunday as
 // off regardless (see withinWorkHours), so an in-lieu-of weekday
 // shift would be redundant here; if a holiday lands on a weekend, that
 // day was already going to be off.

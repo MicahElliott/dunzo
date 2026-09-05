@@ -1,6 +1,6 @@
-# Dunzo Session Save — 2026-08-28 — Planning → Implementation Handoff
+# Dunnit Session Save — 2026-08-28 — Planning → Implementation Handoff
 
-Personal project: `/Users/E463390/proj/dunzo` (git repo, direct commits
+Personal project: `/Users/E463390/proj/dunnit` (git repo, direct commits
 to `main` are fine). Latest commit: `6aefbc0` "Add PRD and FRD
 brainstorm/planning docs".
 
@@ -62,7 +62,7 @@ categories: `SOMEDAY`, `WAITING`, `FIXME`, `OPTIMIZE`, `QUESTION`,
   the ledger (one-liners) and a markdown summary doc (free-form,
   LLM-drafted then hand-edited, never auto-regenerated over edits).
 - "Daybook" = name of the main capture-window UI only. Product stays
-  named "dunzo" — rename explicitly declined (FR-35: no-go).
+  named "dunnit" — rename explicitly declined (FR-35: no-go).
 - Streaks/consistency nudges: approved (FR-28), positive-only framing.
 - More AI features: explicitly deferred (FR-30), no spec yet.
 - Post-meeting capture (FR-36): early shape = quick multi-category
@@ -70,7 +70,7 @@ categories: `SOMEDAY`, `WAITING`, `FIXME`, `OPTIMIZE`, `QUESTION`,
   the meeting, expected to evolve with real usage.
 - All popups/prompts are called **"nudges"** consistently now.
 - No calendar integration (real `.ics`/`EventKit`) — but a tiny
-  dunzo-native recurring-meeting mini-calendar (FR-15/16) is in scope,
+  dunnit-native recurring-meeting mini-calendar (FR-15/16) is in scope,
   purely user-entered (tag, day-of-week, time).
 
 ## Full FR list location

@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"fyne.io/fyne/v2"

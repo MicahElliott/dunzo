@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ func SetThings() {
 // (day_start, day_end, hourly_minute, lunch_time).
 func showSettings(a fyne.App) {
 	cfg := LoadConfig()
-	w := a.NewWindow("Dunzo Settings")
+	w := a.NewWindow("Dunnit Settings")
 
 	dayStart := widget.NewEntry()
 	dayStart.SetText(cfg.DayStart)
@@ -185,7 +185,7 @@ func showSettings(a fyne.App) {
 
 	// Recurring Meetings (FR-15) is its own dialog/config section, but
 	// Settings is a natural place to also reach it from -- both are
-	// "configure how Dunzo behaves" surfaces.
+	// "configure how Dunnit behaves" surfaces.
 	recurringMeetingsBtn := widget.NewButton("Recurring Meetings\u2026", func() {
 		showMiniCalendarDialog(a, w)
 	})

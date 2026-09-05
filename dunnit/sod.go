@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"strings"
@@ -17,7 +17,7 @@ import (
 // chain of separate popups.
 func showSODWindow(a fyne.App) {
 	runCarryForwardIfNeeded()
-	w := a.NewWindow("Dunzo: Start of Day")
+	w := a.NewWindow("Dunnit: Start of Day")
 
 	listBox := container.NewVBox()
 

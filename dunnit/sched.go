@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"fmt"
@@ -33,7 +33,7 @@ func isFirstWeekdayOfMonth(now time.Time) bool {
 	return now.Day() == first.Day()
 }
 
-// isOffDay reports whether now is a day Dunzo's nudges should be
+// isOffDay reports whether now is a day Dunnit's nudges should be
 // entirely suppressed: a weekend, or (if cfg.SkipUSFederalHolidays is
 // enabled) a US federal holiday, treated identically to a weekend.
 func isOffDay(cfg Config, now time.Time) bool {
@@ -99,7 +99,7 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 				return
 			}
 			a.SendNotification(fyne.NewNotification(
-				"Dunzo", "What are you working on?"))
+				"Dunnit", "What are you working on?"))
 			fyne.Do(func() {
 				w.Show()
 				w.RequestFocus()
@@ -119,7 +119,7 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 					return
 				}
 				a.SendNotification(fyne.NewNotification(
-					"Dunzo Lunchtime", "How are your goals coming along?"))
+					"Dunnit Lunchtime", "How are your goals coming along?"))
 				fyne.Do(func() {
 					w.Show()
 					w.RequestFocus()
@@ -152,7 +152,7 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 				}
 				if isFirstWeekdayOfMonth(now) {
 					a.SendNotification(fyne.NewNotification(
-						"Dunzo", "Start of a new month!"))
+						"Dunnit", "Start of a new month!"))
 					fyne.Do(func() {
 						showMonthReviewWindow(a, periodOffsetAnchor(periodMonth, now, -1))
 						showMonthKickoffWindow(a, now)
@@ -160,7 +160,7 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 					return
 				}
 				a.SendNotification(fyne.NewNotification(
-					"Dunzo", "Good morning! Here's where things stand."))
+					"Dunnit", "Good morning! Here's where things stand."))
 				fyne.Do(func() {
 					showSODWindow(a)
 				})
@@ -180,7 +180,7 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 					return
 				}
 				a.SendNotification(fyne.NewNotification(
-					"Dunzo", "End of day! Let's wrap up."))
+					"Dunnit", "End of day! Let's wrap up."))
 				fyne.Do(func() {
 					showEODWindow(a)
 				})
@@ -229,7 +229,7 @@ func Schedule(a fyne.App, w fyne.Window) gocron.Scheduler {
 					if fired, ok := firedFor[m.Tag]; !ok || !fired.Equal(occ) {
 						firedFor[m.Tag] = occ
 						a.SendNotification(fyne.NewNotification(
-							"Dunzo", "Upcoming meeting "+m.Tag+" at "+m.Time))
+							"Dunnit", "Upcoming meeting "+m.Tag+" at "+m.Time))
 						m := m // capture for closure
 						fyne.Do(func() {
 							if strings.EqualFold(m.Tag, "#dsu") {

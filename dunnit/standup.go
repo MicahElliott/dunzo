@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"fmt"
@@ -227,7 +227,7 @@ func summarizeStandupWithCopilot(lines []string) (string, error) {
 // summary via the shared showGeneratedReport window (Copy/Save/
 // Close), saving to periodReportPath("dsu", today, "20060102").
 func showGeneratedStandupSummary(a fyne.App, parent fyne.Window, summary string) {
-	showGeneratedReport(a, "Dunzo: Generated Standup Summary",
+	showGeneratedReport(a, "Dunnit: Generated Standup Summary",
 		periodReportPath("dsu", time.Now(), "20060102"), summary)
 }
 
@@ -257,7 +257,7 @@ func showStandupExport(a fyne.App) {
 	text := formatStandup(lines)
 	a.Clipboard().SetContent(text)
 
-	w := a.NewWindow("Dunzo: Standup Summary")
+	w := a.NewWindow("Dunnit: Standup Summary")
 
 	itemsEntry := widget.NewMultiLineEntry()
 	itemsEntry.SetMinRowsVisible(10)

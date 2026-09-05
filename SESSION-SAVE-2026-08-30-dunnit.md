@@ -1,6 +1,6 @@
-# Dunzo Session Save — 2026-08-30 — FRD Implementation + UX Polish
+# Dunnit Session Save — 2026-08-30 — FRD Implementation + UX Polish
 
-Personal project: `/Users/E463390/proj/dunzo` (git repo, direct commits
+Personal project: `/Users/E463390/proj/dunnit` (git repo, direct commits
 to `main` are fine, no feature-branch requirement). Latest commit:
 `1a823fa` "Convert Daybook-parented dialogs to standalone windows".
 
@@ -45,7 +45,7 @@ This session (2026-08-29 evening through 2026-08-30) covered:
      reordered Daybook layout (prompt now at top), replaced hardcoded
      `getCommonTopics()` placeholder with a real
      `commonAndRecentTags()` that blends frequency+recency from
-     ledger history, Daybook window titled "Dunzo: Daybook", Settings
+     ledger history, Daybook window titled "Dunnit: Daybook", Settings
      window also links to Recurring Meetings.
 
 ## Immediate next step (where to pick up)
@@ -73,7 +73,7 @@ next steps, in rough priority order:
    popups, FR-34 multi-machine sync, FR-35 product rename [decided:
    no-go, not doing this]). None have been started. See FRD's Phase 5
    section for details/status on each.
-4. There's an untracked `SESSION-SAVE-2026-08-28-dunzo.md` in the
+4. There's an untracked `SESSION-SAVE-2026-08-28-dunnit.md` in the
    repo root -- superseded by this file and the actual FRD progress;
    safe to delete whenever, or ignore.
 
@@ -110,8 +110,8 @@ next steps, in rough priority order:
   Review/Trend View), Ledger (Show/Edit Today's Ledger/Undo-Edit Last
   Entry/Search/Daily Summary Doc), then Help/Settings at the bottom.
 - Daybook's button row is now just: Save, Ditto, Snooze, Help.
-- Config file (`config.toml` under `DunzoDir()`, default
-  `~/.config/dunzo`) now has: `day_start`, `day_end`,
+- Config file (`config.toml` under `DunnitDir()`, default
+  `~/.config/dunnit`) now has: `day_start`, `day_end`,
   `nudge_interval_minutes`, `lunch_time`, `[[recurring_meeting]]`
   array-of-tables, `weekly_digest_day`/`weekly_digest_time`,
   `auto_draft_daily_summary`, `snooze_minutes`.

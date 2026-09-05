@@ -1,6 +1,6 @@
-# Dunzo Session Save — 2026-08-27
+# Dunnit Session Save — 2026-08-27
 
-Personal project: `/Users/E463390/proj/dunzo` (git repo, direct commits
+Personal project: `/Users/E463390/proj/dunnit` (git repo, direct commits
 to `main` are fine — this is a personal project, not a work repo).
 Sister zsh project at `../dunnit` (reference only, bit-rotted, not
 runnable). Private data repo at `../mydunnits`.
@@ -8,8 +8,8 @@ runnable). Private data repo at `../mydunnits`.
 ## Where things stand
 
 Fully working KISS Go/Fyne (v2.8.0) menu-bar app. Builds clean via
-`make build`; `make package` produces `Dunzo.app` with a real icon for
-macOS (use `open Dunzo.app`, not `./dunzo`, to get proper Cmd-Tab
+`make build`; `make package` produces `Dunnit.app` with a real icon for
+macOS (use `open Dunnit.app`, not `./dunnit`, to get proper Cmd-Tab
 identity/icon). All work this session is committed to `main` (latest:
 `48661d6`). README.md and AGENTS.md are up to date and describe the
 architecture — read those first in a new session, they're more
@@ -18,12 +18,12 @@ authoritative than this file for anything not called out below as
 
 ## Key design decisions made this session
 
-- **Single `DUNZO_DIR` env var** controls everything: ledgers at
-  `$DUNZO_DIR/<year>/w<week>-<month>/ledger-<YYYYMMDD>.txt`, config at
-  `$DUNZO_DIR/config.toml`. Default `~/.config/dunzo`. (Went through
-  a few messy iterations — `DUNZO_DIR`/`DUNZO_LEDGER_DIR`/
-  `DUNZO_CONFIG_DIR` confusion — before collapsing to just one var.
-  Micah's actual working setup: `DUNZO_DIR=~/proj/mydunnits`.)
+- **Single `DUNNIT_DIR` env var** controls everything: ledgers at
+  `$DUNNIT_DIR/<year>/w<week>-<month>/ledger-<YYYYMMDD>.txt`, config at
+  `$DUNNIT_DIR/config.toml`. Default `~/.config/dunnit`. (Went through
+  a few messy iterations — `DUNNIT_DIR`/`DUNNIT_LEDGER_DIR`/
+  `DUNNIT_CONFIG_DIR` confusion — before collapsing to just one var.
+  Micah's actual working setup: `DUNNIT_DIR=~/proj/mydunnits`.)
 - Config schema (`dunnit/config.go`): `day_start`, `day_end`,
   `hourly_minute`, `lunch_time` — ported from old dunnit's
   `config-example.zsh`. No `ledger_dir`/`dunnits_dir` key anymore.
@@ -47,11 +47,11 @@ authoritative than this file for anything not called out below as
 - No true OS-level global hotkey to summon the app from anywhere is in
   scope — Fyne can't do it, and a real solution needs OS-level
   accessibility permissions / a new dependency. Recommended path (not
-  implemented, no code involved): OS-native hotkey → `open Dunzo.app`
+  implemented, no code involved): OS-native hotkey → `open Dunnit.app`
   (macOS Automator/Shortcuts quick action, or Linux WM keybinding).
 - Summarize feature (`dunnit/summarize.go`): tray menu → "Summarize..."
   → pick Day/Month/Quarter → gathers matching `ledger-*.txt` files
-  under `$DUNZO_DIR` → shells out to `gh copilot -p "..." --silent
+  under `$DUNNIT_DIR` → shells out to `gh copilot -p "..." --silent
   --allow-all-tools` (no new Go dep) → result auto-copied to clipboard
   and shown in a selectable `MultiLineEntry` window. `gollm` was
   considered but explicitly deferred in favor of the simpler `gh

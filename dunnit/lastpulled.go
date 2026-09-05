@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"encoding/json"
@@ -8,11 +8,11 @@ import (
 )
 
 // lastPulledPath is where per-tag "last agenda pulled" timestamps are
-// stored (FR-12) -- a small JSON file under DunzoDir(), not mixed
+// stored (FR-12) -- a small JSON file under DunnitDir(), not mixed
 // into config.toml since it's transient/derived state rather than
 // user preference.
 func lastPulledPath() string {
-	return filepath.Join(DunzoDir(), "last_pulled.json")
+	return filepath.Join(DunnitDir(), "last_pulled.json")
 }
 
 // loadLastPulled reads the tag -> last-pulled-time map, returning an
@@ -37,7 +37,7 @@ func saveLastPulled(m map[string]time.Time) {
 	if err != nil {
 		return
 	}
-	_ = os.MkdirAll(DunzoDir(), 0755)
+	_ = os.MkdirAll(DunnitDir(), 0755)
 	_ = os.WriteFile(lastPulledPath(), data, 0644)
 }
 

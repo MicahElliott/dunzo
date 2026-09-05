@@ -3,8 +3,8 @@
 ## Context / decision made
 
 Real ledger data lives in `~/proj/mydunnits` (git repo). User just set
-`DUNZO_DIR` in their env to point there (was previously unset/using
-default `~/.config/dunzo`, which is empty in the sandboxed dev
+`DUNNIT_DIR` in their env to point there (was previously unset/using
+default `~/.config/dunnit`, which is empty in the sandboxed dev
 session — don't confuse the two).
 
 **Problem identified**: `getLedger()`/`ledgerDirFor()` (`dunnit/ui.go`)
@@ -23,7 +23,7 @@ This happens ~4-5 times/year, every time a week spans two months.
 
 **Also clarified**: Weekly/Monthly/Quarterly/Annual **Review reports**
 (`review.go`) do NOT currently use this per-week directory scheme at
-all — they're flat files at `DunzoDir()` root (e.g.
+all — they're flat files at `DunnitDir()` root (e.g.
 `review-week-20260831-status_report.md`, via `periodReportPathRaw`).
 Only two things currently use the per-week directory:
 `ledger-YYYYMMDD.txt` files themselves, and the daily-summary doc
@@ -37,12 +37,12 @@ month **fixed by the week's START (Monday), not each day's own
 month**:
 
 ```
-<DunzoDir>/
+<DunnitDir>/
   2026/
     review-quarter-2026Q3-....md      # UNCHANGED: stays flat at year root
     review-year-2026-....md           # UNCHANGED: stays flat at year root
     Aug/
-      review-month-....md             # MOVED here (was flat at DunzoDir root)
+      review-month-....md             # MOVED here (was flat at DunnitDir root)
       w35/
         ledger-20260824.txt ...
       w36/
@@ -115,7 +115,7 @@ Key rules:
    `git mv` renames over delete+add pairs in `git status`.
 
 5. **Final verification against real migrated data** — run/script
-   against `DUNZO_DIR=~/proj/mydunnits` to confirm
+   against `DUNNIT_DIR=~/proj/mydunnits` to confirm
    `getLedger()`/`ledgerDirFor()` resolve to paths that actually exist
    post-migration for a few sample dates (today, and a date in the old
    `w36-Sep` range). Grep the whole `dunnit/` tree once more for any
@@ -167,15 +167,15 @@ except for 2026/w36.
 ## Also worth double-checking early next session
 
 - Whether `~/proj/mydunnits` being a **separate git repo** from
-  `~/proj/dunzo` (the app's own source repo) has any implications for
+  `~/proj/dunnit` (the app's own source repo) has any implications for
   how `git mv` should be run (it should — run `git mv` commands with
-  `working_directory` set to `~/proj/mydunnits`, not `~/proj/dunzo`).
+  `working_directory` set to `~/proj/mydunnits`, not `~/proj/dunnit`).
   **Confirmed via `eca__shell_command` with `working_directory` set**
   that `git status --short` in `~/proj/mydunnits` shows a clean tree
   (only untracked `2026/`, `config.toml`, `dsu-*.md`,
   `last_pulled.json` — nothing already staged/modified). Note: the
   `eca__git` tool itself does NOT accept a working-directory override
-  and always runs against the main workspace root (`~/proj/dunzo`) —
+  and always runs against the main workspace root (`~/proj/dunnit`) —
   use `eca__shell_command` with an explicit `working_directory` for
   all `git`/`git mv` operations against `~/proj/mydunnits` instead.
 - Whether other years (2021, 2025) have any week-spans-month-boundary

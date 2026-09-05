@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"time"
@@ -32,7 +32,7 @@ const periodPickerBackOffsets = 4
 // alongside this fix -- that's tracked as a separate future task.
 func showPeriodPicker(a fyne.App, cfg Config, period summaryPeriod, onChosen func(anchor time.Time)) {
 	now := time.Now()
-	w := a.NewWindow("Dunzo: Which " + string(period) + "?")
+	w := a.NewWindow("Dunnit: Which " + string(period) + "?")
 
 	list := container.NewVBox()
 	addOption := func(offset int) {

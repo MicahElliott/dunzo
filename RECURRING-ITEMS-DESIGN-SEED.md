@@ -1,4 +1,4 @@
-# Dunzo: Recurring TODOs/GOALs -- Design Seed
+# Dunnit: Recurring TODOs/GOALs -- Design Seed
 
 Status: **implemented (v1)**. Decisions below were made and acted on
 in the follow-up session; see "Implementation notes" for what

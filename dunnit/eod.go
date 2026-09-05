@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"log"
@@ -91,7 +91,7 @@ func eodOpenItemsSection(category string) (box *fyne.Container, items []OpenItem
 // original zsh alerter-based flow did), this is one window with all
 // the questions -- simpler to implement and to answer.
 func showEODWindow(a fyne.App) {
-	w := a.NewWindow("Dunzo: End of Day")
+	w := a.NewWindow("Dunnit: End of Day")
 
 	// Today's items, shown first -- read-only, so the user has the
 	// full day in view before answering anything below. Uses a plain

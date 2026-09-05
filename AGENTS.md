@@ -6,7 +6,7 @@ Guidance for AI coding assistants working in this repo.
 
 At the start of each session, read `~/.config/ai-rules/global.md`,
 then inspect the frontmatter in `~/.config/ai-rules/rules/` and read
-only rules whose path or other scope matches `~/proj/dunzo` and the
+only rules whose path or other scope matches `~/proj/dunnit` and the
 current task. Read the shared `projects/dunnit.md` mapping because this repo
 is its Go rewrite, and continue using it if the project is renamed Dunnit.
 Ignore rules that refer to unavailable tools, services, or environments.
@@ -17,7 +17,7 @@ that the shared rules could not be loaded.
 
 ## Project intent
 
-Dunzo is a **KISS** Go/Fyne rewrite of `../dunnit` (a zsh
+Dunnit is a **KISS** Go/Fyne rewrite of `../dunnit` (a zsh
 proof-of-concept, see its `README.md` and `dunnit.zsh` for the
 original design and behavior). Keep dependencies and LOC minimal.
 Prefer reusing what's already in `go.mod` (e.g.
@@ -38,14 +38,14 @@ macOS and Linux.
   properly** to the config or UI (still has hardcoded demo times).
 - `dunnit/settings.go` — placeholder Settings window (dummy checkbox
   only so far).
-- `dunnit/config.go` — TOML config load/save. Everything dunzo owns
-  (ledgers + config.toml) lives under one root dir, `DunzoDir()`
-  (`~/.config/dunzo` by default, override with `$DUNZO_DIR`).
+- `dunnit/config.go` — TOML config load/save. Everything dunnit owns
+  (ledgers + config.toml) lives under one root dir, `DunnitDir()`
+  (`~/.config/dunnit` by default, override with `$DUNNIT_DIR`).
 - `dunnit/taskmenu.go` — currently just a stub, not wired to anything.
 
 ## Data format
 
-Ledger files: `$DUNZO_DIR/<year>/w<week>-<month>/ledger-<YYYYMMDD>.txt`,
+Ledger files: `$DUNNIT_DIR/<year>/w<week>-<month>/ledger-<YYYYMMDD>.txt`,
 one line per entry: `[HH:MM:SS] CATEGORY free text #tag`. See sample
 real data in the sibling `../mydunnits` repo for ground truth on
 format nuances (e.g. `GOAL`, `DONE`, `MEETING`, `TIL`, `WIN` categories
@@ -56,7 +56,7 @@ final — the Fyne UI currently defines its own (with emoji labels) in
 ## Build/verify
 
 ```sh
-make build   # go build -o dunzo .
+make build   # go build -o dunnit .
 make vet     # go vet ./...
 make package # macOS only; requires `fyne` CLI (go install fyne.io/tools/cmd/fyne@latest)
 ```
@@ -66,7 +66,7 @@ edits — there's no CI here yet. First build of Fyne's cgo/GL deps can
 take a couple minutes; subsequent builds are fast.
 
 There is no automated test suite yet. Manual testing is done by the
-human running `./dunzo` or `Dunzo.app` and clicking around — when
+human running `./dunnit` or `Dunnit.app` and clicking around — when
 making UI changes, describe what to click/verify rather than assuming
 you can confirm it yourself.
 

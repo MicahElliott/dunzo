@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"strconv"
@@ -31,7 +31,7 @@ const annualReviewPrompt = "Summarize the following IMPACT/MILESTONE/WIN " +
 // is normally hidden, and this is a tray-invoked, occasional workflow
 // with no dependency on Daybook being open.
 func showAnnualReviewDialog(a fyne.App) {
-	w := a.NewWindow("Dunzo: Annual Review")
+	w := a.NewWindow("Dunnit: Annual Review")
 
 	currentYear := time.Now().Year()
 	yearEntry := widget.NewEntry()
@@ -65,13 +65,13 @@ func runAnnualReview(a fyne.App, year int) {
 	to := time.Date(year, time.December, 31, 23, 59, 59, 0, time.Local)
 	ledgerText := gatherLedgerTextForRange(from, to, annualReviewCategories)
 	if ledgerText == "" {
-		w := a.NewWindow("Dunzo: Annual Review")
+		w := a.NewWindow("Dunnit: Annual Review")
 		w.SetContent(windowPad(widget.NewLabel("No IMPACT/MILESTONE/WIN entries found for that year.")))
 		w.Show()
 		return
 	}
 
-	progress := a.NewWindow("Dunzo: Generating Annual Review\u2026")
+	progress := a.NewWindow("Dunnit: Generating Annual Review\u2026")
 	progress.SetContent(windowPad(widget.NewLabel(
 		"Asking gh copilot to summarize, please wait\u2026\n" +
 			"The generated report will be copied to your clipboard automatically.")))
@@ -81,7 +81,7 @@ func runAnnualReview(a fyne.App, year int) {
 		summary, err := summarizeWithCopilotPrompt(annualReviewPrompt, ledgerText)
 		fyne.Do(func() {
 			progress.Close()
-			w := a.NewWindow("Dunzo: Annual Review " + strconv.Itoa(year))
+			w := a.NewWindow("Dunnit: Annual Review " + strconv.Itoa(year))
 			if err != nil {
 				w.SetContent(windowPad(widget.NewLabel("Error running gh copilot:\n" + err.Error())))
 			} else {

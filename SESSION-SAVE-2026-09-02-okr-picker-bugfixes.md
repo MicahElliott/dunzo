@@ -1,4 +1,4 @@
-# Dunzo Session Save -- 2026-09-02 -- Pending/Open Items After OKR + Bugfix Session
+# Dunnit Session Save -- 2026-09-02 -- Pending/Open Items After OKR + Bugfix Session
 
 Status: everything from this session is committed and pushed to
 `origin/main` (commits `e4f407f`, `99b69a4`, `5dd4dc3`, on top of the

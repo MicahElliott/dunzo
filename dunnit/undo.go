@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"os"
@@ -254,7 +254,7 @@ func showUndoEditLastEntry(a fyne.App, onChange func()) {
 	}
 	last := lines[len(lines)-1]
 
-	w := a.NewWindow("Dunzo: Undo/Edit Last Entry")
+	w := a.NewWindow("Dunnit: Undo/Edit Last Entry")
 
 	entry := widget.NewMultiLineEntry()
 	entry.SetText(last)

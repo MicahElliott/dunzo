@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"os"

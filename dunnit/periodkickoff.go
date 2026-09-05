@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"strings"
@@ -137,7 +137,7 @@ func showPeriodKickoffWindow(a fyne.App, period summaryPeriod, anchor time.Time)
 	now := time.Now()
 	cfg := LoadConfig()
 	label := periodLabel(cfg, period, anchor) + periodProgressSuffix(period, anchor)
-	w := a.NewWindow("Dunzo: " + string(period) + " Kickoff (" + label + ")")
+	w := a.NewWindow("Dunnit: " + string(period) + " Kickoff (" + label + ")")
 
 	listBox := container.NewVBox()
 	refreshList := func() {

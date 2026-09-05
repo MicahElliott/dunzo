@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"path/filepath"
@@ -51,7 +51,7 @@ func searchLedgers(query string) []searchResult {
 // is normally hidden, and this is a tray-invoked, occasional workflow
 // with no dependency on Daybook being open.
 func showSearchDialog(a fyne.App) {
-	w := a.NewWindow("Dunzo: Search Ledger History")
+	w := a.NewWindow("Dunnit: Search Ledger History")
 
 	queryEntry := widget.NewEntry()
 	queryEntry.SetPlaceHolder("Search term (tag, category, or keyword)\u2026")

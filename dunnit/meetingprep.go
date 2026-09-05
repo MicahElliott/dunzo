@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"bufio"
@@ -119,7 +119,7 @@ func lastN(entries []taggedEntry, n int) []taggedEntry {
 // is normally hidden, and this is a tray-invoked, occasional workflow
 // with no dependency on Daybook being open.
 func showMeetingPrepDialog(a fyne.App) {
-	w := a.NewWindow("Dunzo: Meeting Prep")
+	w := a.NewWindow("Dunnit: Meeting Prep")
 
 	tagEntry := widget.NewEntry()
 	tagEntry.SetPlaceHolder("#tag (e.g. #jeff, #boss)")

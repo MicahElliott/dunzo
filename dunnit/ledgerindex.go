@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"sync"
@@ -6,7 +6,7 @@ import (
 )
 
 // ledgerIndex holds a scanned, fully-parsed view of every ledger
-// line under DunzoDir(), refreshed at most every ledgerIndexTTL
+// line under DunnitDir(), refreshed at most every ledgerIndexTTL
 // rather than rescanning on every call -- same caching philosophy as
 // tags.go's tagCache, just holding parsed LedgerEntry structs instead
 // of bare tag strings. A sync.RWMutex (rather than tagCache's plain
@@ -65,7 +65,7 @@ func InvalidateLedgerCaches() {
 }
 
 // scanAllLedgerEntries walks every ledger-*.txt file under
-// DunzoDir() (allLedgerFiles, summarize.go) and parses every line
+// DunnitDir() (allLedgerFiles, summarize.go) and parses every line
 // into a LedgerEntry, skipping lines that don't parse (same
 // leniency parseLedgerLine's other callers already have). Result is
 // sorted oldest-first by Date (ties broken by original file-walk/

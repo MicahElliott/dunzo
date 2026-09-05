@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"fmt"
@@ -47,7 +47,7 @@ func extractTags(text string) []string {
 }
 
 // tagCache holds a scanned + deduplicated list of every #tag seen
-// across all ledger files under DunzoDir(), refreshed at most every
+// across all ledger files under DunnitDir(), refreshed at most every
 // tagCacheTTL rather than rescanning on every keystroke (FR-10).
 type tagCache struct {
 	mu        sync.Mutex
@@ -299,7 +299,7 @@ func isTagBreak(r rune) bool {
 // all its historical occurrences is a possible future extension (see
 // tags.go's package doc) -- not implemented here, this is read-only.
 func showAllTagsWindow(a fyne.App) {
-	w := a.NewWindow("Dunzo: All Tags")
+	w := a.NewWindow("Dunnit: All Tags")
 
 	stats := filterNumericTags(gatherTagStats())
 	ranked := rankTagsByScore(stats)

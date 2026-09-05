@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 // Category defines one selectable Daybook category: its short code
 // (written verbatim into ledger lines) and the emoji-prefixed label

@@ -1,11 +1,11 @@
-package dun
+package dunnit
 
 import (
 	"testing"
 )
 
 func TestGatherSomedayItems_ListsUnhandled(t *testing.T) {
-	withTempDunzoDir(t)
+	withTempDunnitDir(t)
 
 	recordActivity("clean the garage", "SOMEDAY")
 	recordActivity("read that book", "SOMEDAY")
@@ -17,7 +17,7 @@ func TestGatherSomedayItems_ListsUnhandled(t *testing.T) {
 }
 
 func TestGatherSomedayItems_ExcludesPromoted(t *testing.T) {
-	withTempDunzoDir(t)
+	withTempDunnitDir(t)
 
 	recordActivity("clean the garage", "SOMEDAY")
 	item := OpenItem{Category: "SOMEDAY", Text: "clean the garage"}
@@ -42,7 +42,7 @@ func TestGatherSomedayItems_ExcludesPromoted(t *testing.T) {
 }
 
 func TestGatherSomedayItems_ExcludesDiscarded(t *testing.T) {
-	withTempDunzoDir(t)
+	withTempDunnitDir(t)
 
 	recordActivity("clean the garage", "SOMEDAY")
 	discardSomedayItem(OpenItem{Category: "SOMEDAY", Text: "clean the garage"})

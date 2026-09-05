@@ -1,4 +1,4 @@
-# Dunzo Session Save -- 2026-08-31 -- recurring-items, Daybook sections, GoReleaser
+# Dunnit Session Save -- 2026-08-31 -- recurring-items, Daybook sections, GoReleaser
 
 Status: work described below is **done and verified** (build/vet/test
 clean) except the GoReleaser/GH Actions piece, which is **deferred to
@@ -120,7 +120,7 @@ others.
   all clean.
 - Wrote and ran (then deleted) a throwaway `zzcheck_test.go` exercising
   `getCategoryGroupItems`/`groupCategoryItemsByGroup`/
-  `CategoryLabelsForGroup` end-to-end against a temp `DUNZO_DIR` --
+  `CategoryLabelsForGroup` end-to-end against a temp `DUNNIT_DIR` --
   confirmed IDEA no longer appears in `getOpenItems()`, IDEA's group
   is now `"plan"`, `"now"`-group items count correctly includes
   DONE/ONGOING/WIN, `"reflect"`-group items correctly picks up IMPACT
@@ -143,14 +143,14 @@ session before any workflow file gets written.
 
 Repo facts gathered this session, useful context for next time:
 - No `.github/` directory exists yet at all (no CI of any kind).
-- `git remote -v` -> `https://github.com/MicahElliott/dunzo.git`
+- `git remote -v` -> `https://github.com/MicahElliott/dunnit.git`
   (origin, both fetch/push) -- so releases would publish to
-  `MicahElliott/dunzo` on github.com (not GH Enterprise, no
+  `MicahElliott/dunnit` on github.com (not GH Enterprise, no
   `gh-enterprise-host-gotcha.md` concerns here since this is a
   personal, not work, repo).
 - Module name is `gsd` (`go.mod`), Go version `1.23.7`.
 - Current build path is a plain `Makefile` (`make build` ->
-  `go build -o dunzo .`; `make package` -> `fyne package -os darwin
+  `go build -o dunnit .`; `make package` -> `fyne package -os darwin
   -icon Icon.png`, macOS-only, requires the separately-installed
   `fyne` CLI).
 - This is a Fyne (GUI, cgo/OpenGL-backed) app -- **not** a typical

@@ -1,4 +1,4 @@
-# Dunzo Session Save -- 2026-09-02 -- Navigator/Reports/Taxonomy Session
+# Dunnit Session Save -- 2026-09-02 -- Navigator/Reports/Taxonomy Session
 
 Status: everything from this session is committed and pushed to
 `origin/main` (11 commits, `fa15ac7`..`ff5a714`, on top of the earlier
@@ -12,7 +12,7 @@ session produced.
 
 ## What got built this session (chronological)
 
-1. **Makefile fix**: `dunzo` target made `.PHONY`/unconditional --
+1. **Makefile fix**: `dunnit` target made `.PHONY`/unconditional --
    was vulnerable to a real Make staleness bug (mtime-tie between an
    edit and its build could make `make build`/`make run` silently
    skip rebuilding). Also dropped `ditto` (macOS-only) for portable

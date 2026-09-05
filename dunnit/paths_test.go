@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"os"
@@ -11,11 +11,11 @@ import (
 // correctly resolves to existing files in the migrated ~/proj/mydunnits directory.
 // This is the post-migration verification step.
 func TestPathResolutionAgainstMigratedData(t *testing.T) {
-	// Temporarily override DunzoDir for this test
-	// The test will look for actual migrated data if DUNZO_DIR is set to ~/proj/mydunnits
-	dunzoDirEnv := os.Getenv("DUNZO_DIR")
-	if dunzoDirEnv == "" {
-		t.Skip("DUNZO_DIR not set; skipping live data verification test")
+	// Temporarily override DunnitDir for this test
+	// The test will look for actual migrated data if DUNNIT_DIR is set to ~/proj/mydunnits
+	dunnitDirEnv := os.Getenv("DUNNIT_DIR")
+	if dunnitDirEnv == "" {
+		t.Skip("DUNNIT_DIR not set; skipping live data verification test")
 	}
 
 	tests := []struct {

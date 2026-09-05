@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"strings"
@@ -39,7 +39,7 @@ var postMeetingCategories = []string{"TIL", "GOAL", "RISK"}
 // is normally hidden, and this is a tray-invoked, occasional workflow
 // with no dependency on Daybook being open.
 func showPostMeetingCapture(a fyne.App, tag string) {
-	w := a.NewWindow("Dunzo: Post-Meeting Capture")
+	w := a.NewWindow("Dunnit: Post-Meeting Capture")
 
 	tagEntry := widget.NewEntry()
 	tagEntry.SetPlaceHolder("#tag (e.g. #boss) \u2014 entries are grouped under this tag")

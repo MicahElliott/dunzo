@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"strings"
@@ -30,7 +30,7 @@ func showMonthKickoffWindow(a fyne.App, anchor time.Time) {
 	now := time.Now()
 	cfg := LoadConfig()
 	label := periodLabel(cfg, periodMonth, anchor)
-	w := a.NewWindow("Dunzo: Month Kickoff \u2014 Planning " + label)
+	w := a.NewWindow("Dunnit: Month Kickoff \u2014 Planning " + label)
 
 	// Current GOALs readback + entry for the new month.
 	var currentGoals []OpenItem

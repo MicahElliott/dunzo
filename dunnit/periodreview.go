@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"log"
@@ -91,7 +91,7 @@ func okrReviewSection(period summaryPeriod, anchor time.Time) (box fyne.CanvasOb
 func showPeriodReviewWindow(a fyne.App, period summaryPeriod, anchor time.Time) {
 	cfg := LoadConfig()
 	label := periodLabel(cfg, period, anchor) + periodProgressSuffix(period, anchor)
-	w := a.NewWindow("Dunzo: " + string(period) + " Review (" + label + ")")
+	w := a.NewWindow("Dunnit: " + string(period) + " Review (" + label + ")")
 
 	themeSelect := widget.NewSelect(themeOptions(), nil)
 	themeSelect.SetSelected(themeDisplayNames[themeFor(cfg, period)])
@@ -118,7 +118,7 @@ func showPeriodReviewWindow(a fyne.App, period summaryPeriod, anchor time.Time) 
 					return
 				}
 				showEditableReportWindow(a,
-					"Dunzo: "+string(period)+" Review Report ("+label+")",
+					"Dunnit: "+string(period)+" Review Report ("+label+")",
 					path, string(body))
 			}))
 		}
@@ -146,7 +146,7 @@ func showPeriodReviewWindow(a fyne.App, period summaryPeriod, anchor time.Time) 
 				}
 				statusLabel.SetText("Generated.")
 				showEditableReportWindow(a,
-					"Dunzo: "+string(period)+" Review Report ("+label+")",
+					"Dunnit: "+string(period)+" Review Report ("+label+")",
 					reviewReportPath(period, anchor, selectedTheme), summary)
 			})
 		}()

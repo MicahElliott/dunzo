@@ -74,7 +74,7 @@ sharing the bucket were.
 Comparing to scrum/issue-tracker taxonomies (Jira issue types, GitHub's
 default Issues labels: Bug, Enhancement, ...):
 
-| Jira/GitHub | Dunzo | Relationship |
+| Jira/GitHub | Dunnit | Relationship |
 |---|---|---|
 | Bug | FIXME | Same concept: a genuinely different *type* of item (fixing vs. building), not a maturity stage of TODO. |
 | Story/Feature (un-scoped) | IDEA | IDEA is essentially an un-scoped Story/Feature -- an earlier maturity stage of TODO, not a sibling type the way Bug is. |
@@ -98,10 +98,10 @@ compared to every other Plan-group category (which are all specific,
 obvious-at-a-glance concepts). A look at real logged TODOs showed
 recurring shapes: "Set up...", "Talk to...", "Prep for...", "Explore
 if...", "Create a...". This confirms there's a real need for a
-generic "thing that needs to get done" bucket -- Dunzo can't cleanly
+generic "thing that needs to get done" bucket -- Dunnit can't cleanly
 get rid of it, and no clearly-better replacement word was found. TODO
 also carries some baggage (it evokes generic "Todo apps," a category
-Dunzo is deliberately not trying to be) but renaming was judged not
+Dunnit is deliberately not trying to be) but renaming was judged not
 worth pursuing without a concrete better alternative in hand. Revisit
 only if a good replacement word surfaces.
 
@@ -131,7 +131,7 @@ e.g. a DONE line noting `(from TODO)`. Current status:
      infrastructure: autocomplete, `KnownTags()`, etc.) rather than a
      bespoke `(from X)` parse target, if real analysis is wanted later.
 - Deliberately **not** turned into an enforced state machine --
-  Dunzo's design ethos is lightweight/manual logging, not a workflow
+  Dunnit's design ethos is lightweight/manual logging, not a workflow
   engine. Exceptions are expected in practice (e.g. a WIN or KUDOS
   could also "close out" something; TIL sometimes documents resolving
   a QUESTION) -- a strict FSM would fight this rather than help it.

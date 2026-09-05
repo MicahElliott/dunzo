@@ -1,4 +1,4 @@
-# Dunzo Session Save -- 2026-09-02 -- Kickoff/Review implementation, next: design Quarter/Year Kickoff content
+# Dunnit Session Save -- 2026-09-02 -- Kickoff/Review implementation, next: design Quarter/Year Kickoff content
 
 Status: everything below is done, committed, and pushed to
 `origin/main`. The next piece of work -- designing what Quarter/Year
@@ -121,7 +121,7 @@ handoff). Starting points for that conversation:
 - Worth asking Micah directly: does he actually use quarterly/annual
   goal-setting himself (e.g. for a work performance-review cycle), and
   if so what does that process concretely look like today (outside
-  Dunzo) that a Quarter/Year Kickoff could usefully echo?
+  Dunnit) that a Quarter/Year Kickoff could usefully echo?
 
 ## Verification performed this session
 

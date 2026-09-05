@@ -1,8 +1,8 @@
-# Dunzo User Guide
+# Dunnit User Guide
 
-## Why Dunzo
+## Why Dunnit
 
-Dunzo is a factual, not aspirational, activity tracker. Once an hour,
+Dunnit is a factual, not aspirational, activity tracker. Once an hour,
 it asks one question — "what are you working on?" — and appends your
 answer to a plain-text daily ledger. No planning, no TODOs, no guilt:
 just a running, honest record of what actually happened. Over weeks
@@ -13,11 +13,11 @@ cross-platform, and the data is always yours: plain text, optionally
 synced with git, readable and editable with nothing more than a text
 editor if you ever want to go tool-free.
 
-### Why Dunzo, longer version
+### Why Dunnit, longer version
 
-**Dunzo answers a different question than most productivity tools.**
+**Dunnit answers a different question than most productivity tools.**
 TODO apps and planners ask "what should I do?" — a question about the
-future, which is aspirational and often wrong. Dunzo asks "what are
+future, which is aspirational and often wrong. Dunnit asks "what are
 you doing right now?" — a question about the present moment, answered
 in the five seconds it takes to type a short line and dismiss a popup.
 It's not about going back to reconstruct your day later; it's about
@@ -32,7 +32,7 @@ categorization required, no forms, no mouse. Over a day that becomes a
 timeline; over a week, a status report; over a quarter, an impact
 review; over a year, a resume's worth of raw material.
 
-Everything about Dunzo is built to make that habit frictionless and
+Everything about Dunnit is built to make that habit frictionless and
 permanent:
 
 - **It's tiny and fast** (a ~20MB desktop app) and **keyboard-first**,
@@ -43,7 +43,7 @@ permanent:
   organized by day/week/month. Sync them with git if you want history
   and backup, or query them via a lightweight local sqlite view if you
   want structure — but the source of truth is always human-readable
-  text. If Dunzo disappeared tomorrow, you could keep doing this by
+  text. If Dunnit disappeared tomorrow, you could keep doing this by
   hand in any editor.
 - **It's open source**, so there's nothing hidden about how your data
   is stored or used.
@@ -55,7 +55,7 @@ The ledger itself borrows from older, well-tested ideas: the
 append-only, timestamped-entry discipline of **accounting ledgers**;
 the small, frequent, factual check-ins of **agile standups and
 retros** (favoring "what happened" over big upfront planning); and the
-daily-capture habit of journaling and bullet-journaling. Dunzo just
+daily-capture habit of journaling and bullet-journaling. Dunnit just
 automates the prompting and the aggregation.
 
 The long-term payoff is bigger than any single day's log: once you
@@ -94,7 +94,7 @@ reconstructed from memory at review time.
 
 ## Methodology
 
-Dunzo's methodology is a nested loop, the same "capture now, reflect a
+Dunnit's methodology is a nested loop, the same "capture now, reflect a
 little later" pattern repeated at increasing scale:
 
 - **Hourly**: the popup captures a one-line entry, tagged with a

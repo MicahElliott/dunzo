@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"bufio"
@@ -26,7 +26,7 @@ const (
 	periodYear    summaryPeriod = "Year"
 )
 
-// ledgerFilesFor returns the paths of ledger files under DunzoDir()
+// ledgerFilesFor returns the paths of ledger files under DunnitDir()
 // whose date falls within the given period, relative to now.
 func ledgerFilesFor(period summaryPeriod, now time.Time) []string {
 	var cutoff time.Time
@@ -59,10 +59,10 @@ func ledgerFilesFor(period summaryPeriod, now time.Time) []string {
 }
 
 // allLedgerFiles returns the paths of every ledger-*.txt file under
-// DunzoDir(), regardless of date, in filesystem walk order.
+// DunnitDir(), regardless of date, in filesystem walk order.
 func allLedgerFiles() []string {
 	var files []string
-	root := DunzoDir()
+	root := DunnitDir()
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
@@ -261,7 +261,7 @@ func summarizeWithCopilot(ledgerText string) (string, error) {
 // is normally hidden, and this is a tray-invoked, occasional workflow
 // with no dependency on Daybook being open.
 func showSummarizeDialog(a fyne.App) {
-	w := a.NewWindow("Dunzo: Summarize")
+	w := a.NewWindow("Dunnit: Summarize")
 
 	options := []string{string(periodDay), string(periodWeek), string(periodMonth), string(periodQuarter)}
 	periodSelect := widget.NewSelect(options, nil)
@@ -290,13 +290,13 @@ func showSummarizeDialog(a fyne.App) {
 func runSummarize(a fyne.App, period summaryPeriod) {
 	ledgerText := gatherLedgerText(period)
 	if strings.TrimSpace(ledgerText) == "" {
-		w := a.NewWindow("Dunzo: Summary")
+		w := a.NewWindow("Dunnit: Summary")
 		w.SetContent(windowPad(widget.NewLabel("No ledger entries found for that period.")))
 		w.Show()
 		return
 	}
 
-	progress := a.NewWindow("Dunzo: Summarizing\u2026")
+	progress := a.NewWindow("Dunnit: Summarizing\u2026")
 	progress.SetContent(windowPad(widget.NewLabel(
 		"Asking gh copilot to summarize, please wait\u2026\n" +
 			"The generated report will be copied to your clipboard automatically.")))
@@ -306,7 +306,7 @@ func runSummarize(a fyne.App, period summaryPeriod) {
 		summary, err := summarizeWithCopilot(ledgerText)
 		fyne.Do(func() {
 			progress.Close()
-			w := a.NewWindow(fmt.Sprintf("Dunzo: %s Summary", period))
+			w := a.NewWindow(fmt.Sprintf("Dunnit: %s Summary", period))
 			if err != nil {
 				w.SetContent(windowPad(widget.NewLabel("Error running gh copilot:\n" + err.Error())))
 			} else {

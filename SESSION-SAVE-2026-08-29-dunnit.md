@@ -1,6 +1,6 @@
-# Dunzo Session Save — 2026-08-29 — Phases 0-3 substantially complete
+# Dunnit Session Save — 2026-08-29 — Phases 0-3 substantially complete
 
-Personal project: `/Users/E463390/proj/dunzo` (git repo, direct commits
+Personal project: `/Users/E463390/proj/dunnit` (git repo, direct commits
 to `main` are fine). Latest commit: `70e720d` "feat: (FR-13)
 Start-of-Day nudge".
 

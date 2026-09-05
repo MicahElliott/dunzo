@@ -1,22 +1,22 @@
-package dun
+package dunnit
 
 import (
 	"os"
 	"testing"
 )
 
-// withTempDunzoDir points DUNZO_DIR at a fresh temp directory for the
+// withTempDunnitDir points DUNNIT_DIR at a fresh temp directory for the
 // duration of a test, restoring the previous value afterward.
-func withTempDunzoDir(t *testing.T) {
+func withTempDunnitDir(t *testing.T) {
 	t.Helper()
-	old := os.Getenv("DUNZO_DIR")
+	old := os.Getenv("DUNNIT_DIR")
 	dir := t.TempDir()
-	os.Setenv("DUNZO_DIR", dir)
-	t.Cleanup(func() { os.Setenv("DUNZO_DIR", old) })
+	os.Setenv("DUNNIT_DIR", dir)
+	t.Cleanup(func() { os.Setenv("DUNNIT_DIR", old) })
 }
 
 func TestRemoveLastLedgerLine(t *testing.T) {
-	withTempDunzoDir(t)
+	withTempDunnitDir(t)
 
 	recordActivity("first", "DONE")
 	recordActivity("second", "DONE")
@@ -35,7 +35,7 @@ func TestRemoveLastLedgerLine(t *testing.T) {
 }
 
 func TestRemoveLastLedgerLine_Empty(t *testing.T) {
-	withTempDunzoDir(t)
+	withTempDunnitDir(t)
 
 	if err := removeLastLedgerLine(); err != nil {
 		t.Fatalf("removeLastLedgerLine on empty ledger should be a no-op, got err: %v", err)
@@ -43,7 +43,7 @@ func TestRemoveLastLedgerLine_Empty(t *testing.T) {
 }
 
 func TestReplaceLastLedgerLine(t *testing.T) {
-	withTempDunzoDir(t)
+	withTempDunnitDir(t)
 
 	recordActivity("first", "DONE")
 	recordActivity("second", "DONE")

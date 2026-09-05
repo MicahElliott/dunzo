@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"log"
@@ -70,7 +70,7 @@ func showMonthReviewWindow(a fyne.App, anchor time.Time) {
 	from, to := periodNominalRange(periodMonth, anchor)
 	cfg := LoadConfig()
 	label := periodLabel(cfg, periodMonth, from) + periodProgressSuffix(periodMonth, from)
-	w := a.NewWindow("Dunzo: Month Review \u2014 Looking Back at " + label)
+	w := a.NewWindow("Dunnit: Month Review \u2014 Looking Back at " + label)
 
 	// Step 1: digest, behind a Generate button.
 	digestBody := widget.NewRichTextFromMarkdown("*Pick a theme, then tap Generate.*")
@@ -95,7 +95,7 @@ func showMonthReviewWindow(a fyne.App, anchor time.Time) {
 					dialog.ShowError(err, w)
 					return
 				}
-				showEditableReportWindow(a, "Dunzo: Month Review Report ("+label+")", path, string(body))
+				showEditableReportWindow(a, "Dunnit: Month Review Report ("+label+")", path, string(body))
 			}))
 		}
 	}
@@ -124,7 +124,7 @@ func showMonthReviewWindow(a fyne.App, anchor time.Time) {
 				statusLabel.SetText("Generated.")
 				digestBody.ParseMarkdown(summary)
 				showEditableReportWindow(a,
-					"Dunzo: Month Review Report ("+label+")",
+					"Dunnit: Month Review Report ("+label+")",
 					reviewReportPath(periodMonth, from, selectedTheme), summary)
 			})
 		}()

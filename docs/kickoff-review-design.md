@@ -121,7 +121,7 @@ updates can bump Week to "Status Report."
 
 ## Output formats -- Markdown/HTML native, Pandoc for everything else
 
-Per this repo's KISS/no-new-heavy-deps stance: Dunzo always generates
+Per this repo's KISS/no-new-heavy-deps stance: Dunnit always generates
 **Markdown** (source of truth) and can always render **HTML** from it
 (cheap, no new dependency -- reuses the existing markdown-preview
 pipeline). Each theme gets Markdown/HTML layout templates suited to
@@ -237,7 +237,7 @@ type reviewSourceMaterial struct {
 //  1. Determine period's sub-tier via periodConfig (Day/Week have
 //     none -- always raw ledger only).
 //  2. List saved report files for that sub-tier kind (globs
-//     DunzoDir()/<subKind>-*.md via periodReportPath's naming
+//     DunnitDir()/<subKind>-*.md via periodReportPath's naming
 //     convention), parse each's embedded date, keep ones whose
 //     nominal range intersects [from, to] at all (loose).
 //  3. Track, loosely, which whole sub-periods were found covered.

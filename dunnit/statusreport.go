@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"errors"
@@ -36,7 +36,7 @@ const shareableStatusPrompt = "Summarize the following ledger entries into a " +
 // is normally hidden, and this is a tray-invoked, occasional workflow
 // with no dependency on Daybook being open.
 func showStatusReportDialog(a fyne.App) {
-	w := a.NewWindow("Dunzo: Status Report")
+	w := a.NewWindow("Dunnit: Status Report")
 
 	today := time.Now()
 	fromEntry := widget.NewEntry()
@@ -100,13 +100,13 @@ func runStatusReport(a fyne.App, from, to time.Time, audience string) {
 
 	ledgerText := gatherLedgerTextForRange(from, to, categories)
 	if ledgerText == "" {
-		w := a.NewWindow("Dunzo: Status Report")
+		w := a.NewWindow("Dunnit: Status Report")
 		w.SetContent(windowPad(widget.NewLabel("No matching ledger entries found for that range.")))
 		w.Show()
 		return
 	}
 
-	progress := a.NewWindow("Dunzo: Generating Status Report\u2026")
+	progress := a.NewWindow("Dunnit: Generating Status Report\u2026")
 	progress.SetContent(windowPad(widget.NewLabel(
 		"Asking gh copilot to summarize, please wait\u2026\n" +
 			"The generated report will be copied to your clipboard automatically.")))
@@ -116,7 +116,7 @@ func runStatusReport(a fyne.App, from, to time.Time, audience string) {
 		summary, err := summarizeWithCopilotPrompt(prompt, ledgerText)
 		fyne.Do(func() {
 			progress.Close()
-			w := a.NewWindow("Dunzo: " + audience + " Status Report")
+			w := a.NewWindow("Dunnit: " + audience + " Status Report")
 			if err != nil {
 				w.SetContent(windowPad(widget.NewLabel("Error running gh copilot:\n" + err.Error())))
 			} else {

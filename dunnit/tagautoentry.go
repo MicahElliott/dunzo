@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"fyne.io/fyne/v2"
@@ -110,7 +110,7 @@ func (e *tagAutoEntry) clearSuggestions() {
 // render rebuilds the suggestion box's buttons, marking the currently
 // arrow-selected one with a leading "▸" -- clicking a button still
 // works (mouse remains supported), but Up/Down/Enter/Escape is the
-// primary intended path per Dunzo's mouseless-workflow goal.
+// primary intended path per Dunnit's mouseless-workflow goal.
 func (e *tagAutoEntry) render() {
 	e.box.RemoveAll()
 	for i, tag := range e.suggestions {

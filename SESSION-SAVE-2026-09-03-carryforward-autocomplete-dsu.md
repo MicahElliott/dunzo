@@ -1,4 +1,4 @@
-# Dunzo Session Save -- 2026-09-03 -- Tag-Autocomplete Fix, TODO Carry-Forward, Window Polish, DSU Improvements
+# Dunnit Session Save -- 2026-09-03 -- Tag-Autocomplete Fix, TODO Carry-Forward, Window Polish, DSU Improvements
 
 Status: everything described below is implemented and verified
 (`make build`/`go vet ./...`/`go test ./...`/`gofmt -l`/
@@ -23,7 +23,7 @@ doc this session produced.
    suggestions as a plain **inline sibling widget** (a VBox of
    buttons shown/hidden below the entry in the normal layout) --
    never an overlay -- with real Up/Down/Enter/Escape keyboard
-   navigation, preserving Dunzo's mouseless-workflow goal. Migrated
+   navigation, preserving Dunnit's mouseless-workflow goal. Migrated
    all 3 call sites: Daybook's main entry (`ui.go`), Start-of-Day's
    new-item field (`sod.go`), Recurring Meetings' tag field
    (`minicalendar.go`).

@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"os"
@@ -15,7 +15,7 @@ import (
 // See docs/navigator-design.md's "Reports-corpus indexing" section
 // for the fuller design discussion.
 type ReportFile struct {
-	// Path is the absolute file path under DunzoDir().
+	// Path is the absolute file path under DunnitDir().
 	Path string
 	// Kind is the report-family prefix parsed from the filename,
 	// e.g. "review-week", "review-month", "dsu", "summary". Meant
@@ -38,7 +38,7 @@ type ReportFile struct {
 	Date time.Time
 }
 
-// reportFileKinds is every known "<kind>-" filename prefix Dunzo
+// reportFileKinds is every known "<kind>-" filename prefix Dunnit
 // currently saves reports under, longest-first so a longer, more
 // specific prefix (e.g. "review-month") is matched before a shorter
 // one that could otherwise falsely match part of it. Sourced from
@@ -85,7 +85,7 @@ func parseReportFileName(base string) (kind, theme string, ok bool) {
 	return "", "", false
 }
 
-// AllReportFiles walks DunzoDir() (root-level "<kind>-<token>[-<theme>].md"
+// AllReportFiles walks DunnitDir() (root-level "<kind>-<token>[-<theme>].md"
 // files, e.g. review-*/dsu-*/som-*) plus every ledger-adjacent
 // "summary-*.md" daily summary doc (dailysummary.go's per-day-
 // directory convention), returning a ReportFile per match. No
@@ -97,7 +97,7 @@ func parseReportFileName(base string) (kind, theme string, ok bool) {
 func AllReportFiles() []ReportFile {
 	var out []ReportFile
 
-	root := DunzoDir()
+	root := DunnitDir()
 	rootEntries, err := os.ReadDir(root)
 	if err == nil {
 		for _, entry := range rootEntries {
@@ -122,7 +122,7 @@ func AllReportFiles() []ReportFile {
 	}
 
 	// Daily summary docs live alongside their ledger file (one level
-	// down, in a year/w<week>-<month> directory), not at DunzoDir()'s
+	// down, in a year/w<week>-<month> directory), not at DunnitDir()'s
 	// root -- walk those separately.
 	filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil || info.IsDir() {

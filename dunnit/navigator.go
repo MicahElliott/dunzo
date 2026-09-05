@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"fmt"
@@ -100,7 +100,7 @@ func parseNavigatorTagsInput(text string) []string {
 // PRODUCTIVITY/MEETING_HOURS) do appear there even though they're
 // never hand-picked.
 func showNavigatorWindow(a fyne.App) {
-	w := a.NewWindow("Dunzo: Navigator")
+	w := a.NewWindow("Dunnit: Navigator")
 
 	catOptions := make([]string, 0, len(Categories)+1)
 	catOptions = append(catOptions, "All")
@@ -242,7 +242,7 @@ func ledgerEntriesToText(entries []LedgerEntry) string {
 // and so multiple questions can be asked without each answer
 // replacing the last.
 func showNavigatorAIAnswerWindow(a fyne.App, question, answer string) {
-	w := a.NewWindow("Dunzo: Navigator — Ask AI")
+	w := a.NewWindow("Dunnit: Navigator — Ask AI")
 	body := widget.NewMultiLineEntry()
 	body.Wrapping = fyne.TextWrapWord
 	body.SetText(answer)
@@ -345,7 +345,7 @@ func formatCategoryHistogram(entries []LedgerEntry) string {
 // side-by-side with the filtered browse view, same rationale as
 // showNavigatorAIAnswerWindow.
 func showNavigatorHistogramWindow(a fyne.App, entries []LedgerEntry) {
-	w := a.NewWindow("Dunzo: Navigator — Histogram")
+	w := a.NewWindow("Dunnit: Navigator — Histogram")
 	body := widget.NewMultiLineEntry()
 	body.Wrapping = fyne.TextWrapOff
 	body.SetText(formatCategoryHistogram(entries))

@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"os"
@@ -7,7 +7,7 @@ import (
 )
 
 func TestRecordTomorrowGoals(t *testing.T) {
-	withTempDunzoDir(t)
+	withTempDunnitDir(t)
 
 	recordTomorrowGoals([]string{"learn go", "", "  ship feature  "})
 
@@ -23,7 +23,7 @@ func TestRecordTomorrowGoals(t *testing.T) {
 }
 
 func TestTomorrowLedgerPath_IsTomorrow(t *testing.T) {
-	withTempDunzoDir(t)
+	withTempDunnitDir(t)
 
 	_, fname := tomorrowLedgerPath()
 	tomorrow := time.Now().AddDate(0, 0, 1).Format("20060102")

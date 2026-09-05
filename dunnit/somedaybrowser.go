@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"fmt"
@@ -86,7 +86,7 @@ func discardSomedayItem(item OpenItem) {
 // removes them from daily carry-forward. See
 // docs/todo-carryforward-design.md.
 func showSomedayBrowserWindow(a fyne.App) {
-	w := a.NewWindow("Dunzo: SOMEDAY Items")
+	w := a.NewWindow("Dunnit: SOMEDAY Items")
 
 	listBox := container.NewVBox()
 

@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"fmt"
@@ -38,7 +38,7 @@ func reviewReportPath(period summaryPeriod, anchor time.Time, theme string) stri
 			filename += "-" + theme
 		}
 		filename += ".md"
-		return filepath.Join(DunzoDir(), filename)
+		return filepath.Join(DunnitDir(), filename)
 	default:
 		// Fallback (shouldn't happen in practice)
 		token := reviewReportDateToken(period, anchor)
@@ -46,7 +46,7 @@ func reviewReportPath(period summaryPeriod, anchor time.Time, theme string) stri
 		if theme != "" {
 			token += "-" + theme
 		}
-		return filepath.Join(DunzoDir(), kind+"-"+token+".md")
+		return filepath.Join(DunnitDir(), kind+"-"+token+".md")
 	}
 }
 
@@ -71,14 +71,14 @@ func listReviewReportsForPeriod(period summaryPeriod, anchor time.Time) (paths [
 	case periodMonth:
 		yr := anchor.Year()
 		moname := anchor.Format("Jan")
-		dir := filepath.Join(DunzoDir(), strconv.Itoa(yr), moname)
+		dir := filepath.Join(DunnitDir(), strconv.Itoa(yr), moname)
 		pattern = filepath.Join(dir, "review-month-*.md")
 	case periodQuarter:
 		q := quarterOf(anchor)
-		pattern = filepath.Join(DunzoDir(), "review-quarter-*Q"+strconv.Itoa(q)+"-*.md")
+		pattern = filepath.Join(DunnitDir(), "review-quarter-*Q"+strconv.Itoa(q)+"-*.md")
 	case periodYear:
 		yr := anchor.Year()
-		pattern = filepath.Join(DunzoDir(), "review-year-"+strconv.Itoa(yr)+"-*.md")
+		pattern = filepath.Join(DunnitDir(), "review-year-"+strconv.Itoa(yr)+"-*.md")
 	default:
 		return
 	}
@@ -169,11 +169,11 @@ func reviewReportAnchorFromToken(period summaryPeriod, token string) (t time.Tim
 	}
 }
 
-// periodReportPathRaw joins DunzoDir()/<kind>-<token>.md directly,
+// periodReportPathRaw joins DunnitDir()/<kind>-<token>.md directly,
 // bypassing periodReportPath's time.Time-based Format call since
 // Quarter's token isn't produced via time.Time.Format.
 func periodReportPathRaw(kind, token string) string {
-	return filepath.Join(DunzoDir(), kind+"-"+token+".md")
+	return filepath.Join(DunnitDir(), kind+"-"+token+".md")
 }
 
 // listReviewReportsOverlapping returns the saved Review report file
@@ -191,14 +191,14 @@ func listReviewReportsOverlapping(subPeriod summaryPeriod, from, to time.Time) [
 	switch subPeriod {
 	case periodWeek:
 		// Weeks can span multiple month directories, search broadly
-		pattern = filepath.Join(DunzoDir(), "*", "*", "w*-review-*.md")
+		pattern = filepath.Join(DunnitDir(), "*", "*", "w*-review-*.md")
 	case periodMonth:
 		// Search all year/month directories
-		pattern = filepath.Join(DunzoDir(), "*", "*", "review-month-*.md")
+		pattern = filepath.Join(DunnitDir(), "*", "*", "review-month-*.md")
 	case periodQuarter:
-		pattern = filepath.Join(DunzoDir(), "review-quarter-*.md")
+		pattern = filepath.Join(DunnitDir(), "review-quarter-*.md")
 	case periodYear:
-		pattern = filepath.Join(DunzoDir(), "review-year-*.md")
+		pattern = filepath.Join(DunnitDir(), "review-year-*.md")
 	default:
 		return nil
 	}

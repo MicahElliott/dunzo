@@ -1,6 +1,6 @@
-# Dunzo
+# Dunnit
 
-Dunzo is a KISS daily activity tracker: an hourly popup asks "what are
+Dunnit is a KISS daily activity tracker: an hourly popup asks "what are
 you working on?", and your answer gets appended to a timestamped
 ledger file. Over a day/week/month this builds a factual record of
 what you did — handy for standups, status reports, and reviews.
@@ -8,7 +8,7 @@ what you did — handy for standups, status reports, and reviews.
 This is a Go/Fyne rewrite of the original
 [dunnit](https://github.com/MicahElliott/dunnit) zsh proof-of-concept,
 which relied on macOS-only tools (`terminal-notifier`, `alerter`) that
-have since bit-rotted. Dunzo aims to be cross-platform (macOS + Linux)
+have since bit-rotted. Dunnit aims to be cross-platform (macOS + Linux)
 and much smaller in scope.
 
 ## Guiding Principles
@@ -36,13 +36,13 @@ popup and day-start/day-end prompts are not yet wired up — see
 Requires Go 1.23+.
 
 ```sh
-make build   # -> ./dunzo
+make build   # -> ./dunnit
 make run     # build + run directly (shows in terminal, generic icon)
 make vet
 ```
 
 On macOS, for a proper `.app` bundle with a real icon (so Cmd-Tab and
-the Dock show "Dunzo" instead of a terminal window), install the Fyne
+the Dock show "Dunnit" instead of a terminal window), install the Fyne
 packaging tool once:
 
 ```sh
@@ -52,21 +52,21 @@ go install fyne.io/tools/cmd/fyne@latest
 Then:
 
 ```sh
-make package     # -> Dunzo.app
-open Dunzo.app
+make package     # -> Dunnit.app
+open Dunnit.app
 ```
 
 ## Data Storage
 
-Dunzo keeps everything (ledger files and `config.toml`) under a
-single root directory, `~/.config/dunzo` by default, overridable
-with the `DUNZO_DIR` env var (e.g. point it at a private git repo you
+Dunnit keeps everything (ledger files and `config.toml`) under a
+single root directory, `~/.config/dunnit` by default, overridable
+with the `DUNNIT_DIR` env var (e.g. point it at a private git repo you
 sync across machines).
 
 Ledger files, one per day:
 
 ```
-$DUNZO_DIR/<year>/w<week>-<month>/ledger-<YYYYMMDD>.txt
+$DUNNIT_DIR/<year>/w<week>-<month>/ledger-<YYYYMMDD>.txt
 ```
 
 Each line looks like:
@@ -75,13 +75,13 @@ Each line looks like:
 [14:36] DONE Added string splitting for categories #dunnit
 ```
 
-`$DUNZO_DIR` is expected to be (or contain) a git repo (e.g. a private
+`$DUNNIT_DIR` is expected to be (or contain) a git repo (e.g. a private
 `mydunnits` repo) so your history syncs across machines, mirroring the
 original dunnit setup.
 
 ## Configuration
 
-`$DUNZO_DIR/config.toml` is created automatically on first run with
+`$DUNNIT_DIR/config.toml` is created automatically on first run with
 these defaults (ported from dunnit's `config-example.zsh`):
 
 ```toml
@@ -108,6 +108,6 @@ Linux).
 See `../dunnit/README.md` and `../dunnit/dunnit.zsh` for the original
 zsh implementation this project is modeled on — that version has a
 lot more built out (weekly objectives, end-of-day summaries, impact
-reports, TODOs/blockers, pandoc-generated HTML reports) that Dunzo
+reports, TODOs/blockers, pandoc-generated HTML reports) that Dunnit
 doesn't yet have. Treat it as a reference for behavior/conventions
 worth porting, not as current working code.

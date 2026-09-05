@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"fmt"
@@ -288,7 +288,7 @@ func showHelp(a fyne.App) {
 	}
 	labelColWidth++
 
-	w := a.NewWindow("Dunzo: Help")
+	w := a.NewWindow("Dunnit: Help")
 	rows := container.NewVBox()
 	lastGroup := ""
 	for _, c := range Categories {
@@ -366,7 +366,7 @@ func (e *closeShortcutEntry) TypedShortcut(shortcut fyne.Shortcut) {
 	e.tagAutoEntry.TypedShortcut(shortcut)
 }
 
-// BuildMainWindow constructs the main Dunzo entry window and tray menu,
+// BuildMainWindow constructs the main Dunnit entry window and tray menu,
 // but does not show it or start the Fyne event loop -- call a.Run()
 // yourself after this (see dunnit.go). Returns the window so callers
 // (e.g. the scheduler) can Show()/RequestFocus() it later.
@@ -375,7 +375,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 	runCarryForwardIfNeeded()
 	cfg := LoadConfig()
 
-	w4 := a.NewWindow("Dunzo: Daybook")
+	w4 := a.NewWindow("Dunnit: Daybook")
 	// label1 := widget.NewLabel("Label 1")
 	// value1 := widget.NewLabel("Value")
 	// label2 := widget.NewLabel("Label 2")
@@ -514,7 +514,7 @@ func BuildMainWindow(a fyne.App) fyne.Window {
 		})
 	groupFilter.SetSelected(defaultGroupFilter)
 
-	// Dunzo aims to be a mouseless/mouse-optional UI -- keyboard-only
+	// Dunnit aims to be a mouseless/mouse-optional UI -- keyboard-only
 	// operation should always be possible. IMPORTANT: Fyne's focus
 	// traversal (Tab/Shift+Tab) follows each container's *Objects
 	// slice order*, not visual/layout position. container.NewBorder's
@@ -1126,7 +1126,7 @@ func buildTrayMenu(a fyne.App, w4 fyne.Window) *fyne.Menu {
 
 	ledgerMenu := fyne.NewMenu("Ledger",
 		fyne.NewMenuItem("Show Today's Ledger...", func() {
-			w3 := a.NewWindow("Dunzo: Today")
+			w3 := a.NewWindow("Dunnit: Today")
 			w3.SetContent(windowPad(widget.NewLabel(strings.Join(readLedgerLines(), "\n"))))
 			w3.Resize(fyne.NewSize(500, 400))
 			w3.Show()
@@ -1189,7 +1189,7 @@ func buildTrayMenu(a fyne.App, w4 fyne.Window) *fyne.Menu {
 	// Review, Snooze) stay top-level and un-buried; everything else
 	// groups into a submenu by domain (Meetings/Reports/Ledger)
 	// rather than by FR number or chronology.
-	m = fyne.NewMenu("Dunzo",
+	m = fyne.NewMenu("Dunnit",
 		fyne.NewMenuItem("Show", func() {
 			if trayRefreshAll != nil {
 				trayRefreshAll()

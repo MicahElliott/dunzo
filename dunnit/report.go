@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"bytes"
@@ -16,16 +16,16 @@ import (
 	"github.com/yuin/goldmark"
 )
 
-// periodReportPath returns DunzoDir()/<kind>-<date formatted with
+// periodReportPath returns DunnitDir()/<kind>-<date formatted with
 // format>.md, e.g. periodReportPath("dsu", now, "20060102") or
 // periodReportPath("som", from, "200601"). Unifies what were
 // previously two slightly-different ad hoc conventions (dsuSavePath
 // in standup.go, SOM's inline digestSavePath in som.go).
 // dailysummary.go's per-ledger-directory summary-<date>.md convention
 // is intentionally left alone -- it lives alongside its ledger file
-// rather than at DunzoDir()'s root, a deliberately different scheme.
+// rather than at DunnitDir()'s root, a deliberately different scheme.
 func periodReportPath(kind string, date time.Time, format string) string {
-	return filepath.Join(DunzoDir(), kind+"-"+date.Format(format)+".md")
+	return filepath.Join(DunnitDir(), kind+"-"+date.Format(format)+".md")
 }
 
 // showGeneratedReport displays a markdown report in a small

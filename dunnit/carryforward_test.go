@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"os"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestRunCarryForwardIfNeeded_CopiesUnresolvedItem(t *testing.T) {
-	withTempDunzoDir(t)
+	withTempDunnitDir(t)
 
 	// Simulate a TODO logged "yesterday" by writing directly to a
 	// backdated ledger file, since recordActivity always writes to
@@ -35,7 +35,7 @@ func TestRunCarryForwardIfNeeded_CopiesUnresolvedItem(t *testing.T) {
 }
 
 func TestRunCarryForwardIfNeeded_SkipsResolvedItem(t *testing.T) {
-	withTempDunzoDir(t)
+	withTempDunnitDir(t)
 
 	yesterday := time.Now().AddDate(0, 0, -1)
 	writeLedgerLinesForDate(t, yesterday, []string{
@@ -53,7 +53,7 @@ func TestRunCarryForwardIfNeeded_SkipsResolvedItem(t *testing.T) {
 }
 
 func TestRunCarryForwardIfNeeded_IdempotentPerDay(t *testing.T) {
-	withTempDunzoDir(t)
+	withTempDunnitDir(t)
 
 	yesterday := time.Now().AddDate(0, 0, -1)
 	writeLedgerLinesForDate(t, yesterday, []string{
@@ -71,7 +71,7 @@ func TestRunCarryForwardIfNeeded_IdempotentPerDay(t *testing.T) {
 }
 
 func TestRunCarryForwardIfNeeded_PreservesOriginalSinceDate(t *testing.T) {
-	withTempDunzoDir(t)
+	withTempDunnitDir(t)
 
 	twoDaysAgo := time.Now().AddDate(0, 0, -2)
 	writeLedgerLinesForDate(t, twoDaysAgo, []string{

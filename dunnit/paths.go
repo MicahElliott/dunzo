@@ -1,4 +1,4 @@
-package dun
+package dunnit
 
 import (
 	"path/filepath"
@@ -39,7 +39,7 @@ func weekMonthInfo(date time.Time) (int, string, int) {
 // the given ISO year/week and month abbreviation. The month is now
 // always the week's start (Monday), not the individual date's month.
 func ledgerDirFor(yr, wk int, moname string) string {
-	return filepath.Join(DunzoDir(), strconv.Itoa(yr), moname, "w"+strconv.Itoa(wk))
+	return filepath.Join(DunnitDir(), strconv.Itoa(yr), moname, "w"+strconv.Itoa(wk))
 }
 
 // ledgerPathFor returns the full ledger file path for the given date,
@@ -73,7 +73,7 @@ func monthlyReportPath(anchor time.Time, theme string) string {
 	yr := anchor.Year()
 	moname := anchor.Format("Jan")
 	token := anchor.Format("200601") // YYYYMM format
-	dir := filepath.Join(DunzoDir(), strconv.Itoa(yr), moname)
+	dir := filepath.Join(DunnitDir(), strconv.Itoa(yr), moname)
 
 	filename := "review-month-" + token
 	if theme != "" {
@@ -95,7 +95,7 @@ func quarterlyReportPath(anchor time.Time, theme string) string {
 		filename += "-" + theme
 	}
 	filename += ".md"
-	return filepath.Join(DunzoDir(), filename)
+	return filepath.Join(DunnitDir(), filename)
 }
 
 // yearlyReportPath returns the save path for a yearly Review report.
@@ -109,5 +109,5 @@ func yearlyReportPath(anchor time.Time, theme string) string {
 		filename += "-" + theme
 	}
 	filename += ".md"
-	return filepath.Join(DunzoDir(), filename)
+	return filepath.Join(DunnitDir(), filename)
 }
