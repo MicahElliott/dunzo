@@ -24,9 +24,9 @@ jobs:
             artifact: Dunnit-${{ github.ref_name }}-windows.zip
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -41,7 +41,7 @@ jobs:
         run: choco install mingw --no-progress --yes
 
       - name: Install Fyne CLI
-        run: go install fyne.io/tools/cmd/fyne@v2.8.1
+        run: go install fyne.io/tools/cmd/fyne@v1.7.2
 
       - name: Build and test
         run: |
