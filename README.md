@@ -41,20 +41,24 @@ make run     # build + run directly (shows in terminal, generic icon)
 make vet
 ```
 
-On macOS, for a proper `.app` bundle with a real icon (so Cmd-Tab and
-the Dock show "Dunnit" instead of a terminal window), install the Fyne
-packaging tool once:
+For a proper desktop package with a real icon, install the Fyne packaging
+tool once:
 
 ```sh
 go install fyne.io/tools/cmd/fyne@latest
 ```
 
-Then:
+Then, on macOS or Linux:
 
 ```sh
-make package     # -> Dunnit.app
-open Dunnit.app
+make package     # macOS -> Dunnit.app; Linux -> Dunnit.tar.xz
 ```
+
+Packaging is native because Fyne desktop builds use cgo and platform GUI
+libraries. Run `make package` on each release machine, or set
+`TARGET_OS=darwin`/`TARGET_OS=linux` explicitly. `make release VERSION=v0.1.0`
+uploads the matching native artifact to GitHub. Windows releases need a
+Windows runner, such as a physical machine, VM, or GitHub Actions runner.
 
 ## Data Storage
 

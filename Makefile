@@ -1,5 +1,7 @@
 .PHONY: run build package clean vet release dunnit
 
+TARGET_OS ?= $(shell go env GOOS)
+
 build: dunnit
 
 # dunnit is deliberately unconditional (.PHONY, no file-based
@@ -22,9 +24,13 @@ run: build
 	./dunnit
 
 # Requires the `fyne` CLI (go install fyne.io/tools/cmd/fyne@latest).
-# Produces Dunnit.app with the custom icon (macOS only for now).
+# Produces a native desktop package with the custom icon.
 package:
-	fyne package -os darwin -icon Icon.png
+	@if [ "$(TARGET_OS)" != "darwin" ] && [ "$(TARGET_OS)" != "linux" ]; then \
+		echo "Unsupported desktop target: $(TARGET_OS) (supported: darwin, linux)"; \
+		exit 1; \
+	fi
+	fyne package -os $(TARGET_OS) -icon Icon.png
 
 vet:
 	go vet ./...
@@ -32,11 +38,11 @@ vet:
 clean:
 	rm -f dunnit
 	rm -rf Dunnit.app
-	rm -f Dunnit-*-macos.zip
+	rm -f Dunnit-*-macos.zip Dunnit-*-linux.tar.xz Dunnit.tar.xz
 
-# Cuts a local macOS-only release: packages Dunnit.app, zips it, tags
+# Cuts a local native release: packages for the host OS, tags
 # the current commit, pushes the tag, and creates a GitHub Release
-# with the zip attached (via `gh`, using auto-generated notes from
+# with the native artifact attached (via `gh`, using auto-generated notes from
 # commits since the last tag). No CI/GoReleaser involved -- this is
 # purely a local, manual-trigger convenience wrapper.
 #
@@ -51,12 +57,21 @@ release:
 		exit 1; \
 	fi
 	$(MAKE) package
-	rm -f Dunnit-$(VERSION)-macos.zip
-	zip -r -X Dunnit-$(VERSION)-macos.zip Dunnit.app
+	@if [ "$(TARGET_OS)" = "darwin" ]; then \
+		rm -f Dunnit-$(VERSION)-macos.zip; \
+		zip -r -X Dunnit-$(VERSION)-macos.zip Dunnit.app; \
+	else \
+		mv Dunnit.tar.xz Dunnit-$(VERSION)-linux.tar.xz; \
+	fi
 	@# `fyne package` bumps FyneApp.toml's internal Build counter as a
 	@# side effect -- discard that so tagging happens on a clean tree
 	@# matching what was already committed.
 	git checkout -- FyneApp.toml
 	git tag $(VERSION)
 	env -u GH_TOKEN git push origin $(VERSION)
-	env -u GH_TOKEN gh release create $(VERSION) Dunnit-$(VERSION)-macos.zip --title "$(VERSION)" --generate-notes
+	@if [ "$(TARGET_OS)" = "darwin" ]; then \
+		artifact=Dunnit-$(VERSION)-macos.zip; \
+	else \
+		artifact=Dunnit-$(VERSION)-linux.tar.xz; \
+	fi; \
+	env -u GH_TOKEN gh release create $(VERSION) "$$artifact" --title "$(VERSION)" --generate-notes

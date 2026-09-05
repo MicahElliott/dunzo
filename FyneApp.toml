@@ -1,8 +1,8 @@
 Website = "https://github.com/MicahElliott/dunnit"
 
 [Details]
-Icon = "Icon.png"
-Name = "Dunnit"
-ID = "com.micahelliott.dunnit"
-Version = "0.1.0"
-Build = 3
+  Icon = "Icon.png"
+  Name = "Dunnit"
+  ID = "com.micahelliott.dunnit"
+  Version = "0.1.0"
+  Build = 4

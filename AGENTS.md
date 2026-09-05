@@ -58,7 +58,7 @@ final — the Fyne UI currently defines its own (with emoji labels) in
 ```sh
 make build   # go build -o dunnit .
 make vet     # go vet ./...
-make package # macOS only; requires `fyne` CLI (go install fyne.io/tools/cmd/fyne@latest)
+make package # native macOS/Linux package; requires `fyne` CLI (go install fyne.io/tools/cmd/fyne@latest)
 ```
 
 Always run `make build` (and check `go vet`/editor diagnostics) after
