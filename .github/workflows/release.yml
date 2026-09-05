@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: Dunnit-${{ github.ref_name }}-linux.tar.xz
+          - os: macos-latest
+            artifact: Dunnit-${{ github.ref_name }}-macos.zip
+          - os: windows-latest
+            artifact: Dunnit-${{ github.ref_name }}-windows.zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Linux Fyne dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libgl1-mesa-dev xorg-dev
+
+      - name: Install Windows C compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install mingw --no-progress --yes
+
+      - name: Install Fyne CLI
+        run: go install fyne.io/tools/cmd/fyne@v2.8.1
+
+      - name: Build and test
+        run: |
+          go build -o dunnit .
+          go vet ./...
+
+      - name: Package Linux
+        if: runner.os == 'Linux'
+        run: |
+          APP_VERSION="${GITHUB_REF_NAME#v}"
+          fyne package -os linux -name Dunnit -icon Icon.png -appVersion "$APP_VERSION" -release
+          mv Dunnit.tar.xz "${{ matrix.artifact }}"
+
+      - name: Package macOS
+        if: runner.os == 'macOS'
+        run: |
+          APP_VERSION="${GITHUB_REF_NAME#v}"
+          fyne package -os darwin -name Dunnit -icon Icon.png -appVersion "$APP_VERSION" -release
+          zip -r -X "${{ matrix.artifact }}" Dunnit.app
+
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $appVersion = $env:GITHUB_REF_NAME -replace '^v', ''
+          fyne package -os windows -name Dunnit -icon Icon.png -appID com.micahelliott.dunnit -appVersion $appVersion -release
+          Compress-Archive -Path Dunnit.exe -DestinationPath "${{ matrix.artifact }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create release and upload artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" release-assets/* --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes
