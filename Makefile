@@ -1,4 +1,4 @@
-.PHONY: run build package clean vet release dunnit
+.PHONY: run build package clean vet release tag-release dunnit
 
 TARGET_OS ?= $(shell go env GOOS)
 
@@ -26,19 +26,48 @@ run: build
 # Requires the `fyne` CLI (go install fyne.io/tools/cmd/fyne@latest).
 # Produces a native desktop package with the custom icon.
 package:
-	@if [ "$(TARGET_OS)" != "darwin" ] && [ "$(TARGET_OS)" != "linux" ]; then \
-		echo "Unsupported desktop target: $(TARGET_OS) (supported: darwin, linux)"; \
+	@if [ "$(TARGET_OS)" != "darwin" ] && [ "$(TARGET_OS)" != "linux" ] && [ "$(TARGET_OS)" != "windows" ]; then \
+		echo "Unsupported desktop target: $(TARGET_OS) (supported: darwin, linux, windows)"; \
 		exit 1; \
 	fi
-	fyne package -os $(TARGET_OS) -icon Icon.png
+	fyne package -os $(TARGET_OS) -name Dunnit -icon Icon.png
 
 vet:
 	go vet ./...
 
+# Validates the current commit and pushes an annotated version tag. The tag
+# triggers GitHub Actions, which builds and publishes all native artifacts.
+#
+# Usage: make tag-release VERSION=v0.1.0
+tag-release:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Usage: make tag-release VERSION=vX.Y.Z"; \
+		exit 1; \
+	fi
+	@if ! printf '%s\n' "$(VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$$'; then \
+		echo "VERSION must look like v1.2.3 or v1.2.3-rc.1"; \
+		exit 1; \
+	fi
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "Working tree is not clean -- commit or stash changes first."; \
+		git status --short; \
+		exit 1; \
+	fi
+	@if git rev-parse -q --verify "refs/tags/$(VERSION)" >/dev/null; then \
+		echo "Tag already exists: $(VERSION)"; \
+		exit 1; \
+	fi
+	$(MAKE) build
+	$(MAKE) vet
+	git push origin HEAD
+	git tag -a "$(VERSION)" -m "Dunnit $(VERSION)"
+	git push origin "$(VERSION)"
+
 clean:
 	rm -f dunnit
 	rm -rf Dunnit.app
-	rm -f Dunnit-*-macos.zip Dunnit-*-linux.tar.xz Dunnit.tar.xz
+	rm -f Dunnit-*-macos.zip Dunnit-*-linux.tar.xz Dunnit-*-windows.zip
+	rm -f Dunnit.tar.xz Dunnit.exe
 
 # Cuts a local native release: packages for the host OS, tags
 # the current commit, pushes the tag, and creates a GitHub Release

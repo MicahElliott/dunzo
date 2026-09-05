@@ -60,6 +60,23 @@ libraries. Run `make package` on each release machine, or set
 uploads the matching native artifact to GitHub. Windows releases need a
 Windows runner, such as a physical machine, VM, or GitHub Actions runner.
 
+Pushing a tag matching `v*` runs `.github/workflows/release.yml`. It builds
+native Linux, macOS, and Windows packages on GitHub-hosted runners and
+publishes all three artifacts to a GitHub Release. GoReleaser is not required;
+the workflow uses Fyne's CLI directly so the native cgo and GUI toolchains
+remain visible in the build jobs.
+
+To validate and publish a release tag in one step, after committing your
+changes run:
+
+```sh
+make tag-release VERSION=v0.1.0
+```
+
+This requires a clean worktree, runs `make build` and `make vet`, refuses an
+existing tag, pushes the current branch, and then pushes the annotated tag.
+The tag starts the GitHub Actions release workflow.
+
 ## Data Storage
 
 Dunnit keeps everything (ledger files and `config.toml`) under a
