@@ -2,6 +2,19 @@
 
 Guidance for AI coding assistants working in this repo.
 
+## Shared rules
+
+At the start of each session, read `~/.config/ai-rules/global.md`,
+then inspect the frontmatter in `~/.config/ai-rules/rules/` and read
+only rules whose path or other scope matches `~/proj/dunzo` and the
+current task. Read the shared `projects/dunnit.md` mapping because this repo
+is its Go rewrite, and continue using it if the project is renamed Dunnit.
+Ignore rules that refer to unavailable tools, services, or environments.
+System and repository instructions take precedence over shared rules.
+
+If the shared directory is unavailable, continue with this file and mention
+that the shared rules could not be loaded.
+
 ## Project intent
 
 Dunzo is a **KISS** Go/Fyne rewrite of `../dunnit` (a zsh
